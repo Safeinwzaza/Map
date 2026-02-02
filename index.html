@@ -139,11 +139,7 @@
     /* =========================
        6) ปุ่มนำทางไป B
     ========================= */
-    document.getElementById('navigateBtn').addEventListener('click', () => {
-      const url =
-        `https://www.google.com/maps/dir/?api=1&destination=${bLat},${bLng}`;
-      window.open(url, '_blank');
-    });
+    
     let routingControl = null;
     document.getElementById('navigateBtn').addEventListener('click', () => {
   if (!userLat || !userLng) {
