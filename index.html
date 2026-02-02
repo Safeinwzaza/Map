@@ -61,6 +61,27 @@
 
   // อัปเดตทุก 5 วินาที
   setInterval(updateLocation, 5000);
+  // ขอพิกัดผู้ใช้ A
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      function (position) {
+        const userLat = position.coords.latitude;
+        const userLng = position.coords.longitude;
+
+        // marker ของ A
+        const userMarker = L.marker([userLat, userLng], {
+          title: 'ตำแหน่งของคุณ'
+        }).addTo(map);
+
+        userMarker.bindPopup('ตำแหน่งของคุณ').openPopup();
+      },
+      function (error) {
+        alert('ไม่สามารถเข้าถึงตำแหน่งของคุณได้');
+      }
+    );
+  } else {
+    alert('อุปกรณ์นี้ไม่รองรับ GPS');
+  }
 </script>
 
 </body>
