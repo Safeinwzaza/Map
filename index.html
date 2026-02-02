@@ -2,11 +2,17 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8" />
-  <title>LIFF Real-time Map</title>
+  <title>LIFF Real-time Navigation</title>
 
+  <!-- Leaflet -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+
+  <!-- Leaflet Routing -->
+  <link
+    rel="stylesheet"
     href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"
   />
 
@@ -26,37 +32,43 @@
       position: absolute;
       left: 12px;
       z-index: 1000;
-      padding: 14px 18px;      /* ขยายปุ่ม */
-      font-size: 16px;         /* ตัวอักษรใหญ่ขึ้น */
-      background: white;
+      padding: 16px 20px;
+      font-size: 16px;
+      background: #ffffff;
       border: 2px solid #333;
-      border-radius: 10px;
+      border-radius: 12px;
       cursor: pointer;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      box-shadow: 0 3px 8px rgba(0,0,0,0.3);
     }
 
     #focusUserBtn {
       top: 12px;
     }
 
-    #navigateBtn {
-      top: 80px;
+    #routeBtn {
+      top: 90px;
+    }
+
+    #clearRouteBtn {
+      top: 168px;
     }
   </style>
 </head>
 <body>
 
   <button id="focusUserBtn" class="map-btn">📍 กลับมาหาตำแหน่งฉัน</button>
-  <button id="navigateBtn" class="map-btn">🧭 นำทางไปหา B</button>
+  <button id="routeBtn" class="map-btn">🧭 นำทางไปหา B</button>
+  <button id="clearRouteBtn" class="map-btn">❌ ปิดการนำทาง</button>
 
   <div id="map"></div>
-  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
+  <!-- JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
   <script>
     /* =========================
-       1) Map เริ่มต้น (พิษณุโลก)
+       1) Map (พิษณุโลก)
     ========================= */
     const map = L.map('map').setView([16.7469, 100.1969], 15);
 
@@ -80,22 +92,21 @@
     });
 
     /* =========================
-       3) Marker B (มนเรศวร)
+       3) Marker B (มหาวิทยาลัยนเรศวร)
     ========================= */
-    let bLat = 16.7479;  // มหาวิทยาลัยนเรศวร
+    let bLat = 16.7479;
     let bLng = 100.1947;
 
     const bMarker = L.marker([bLat, bLng], { icon: bIcon })
       .addTo(map)
-      .bindPopup('ตำแหน่ง B (นเรศวร)');
+      .bindPopup('ตำแหน่ง B');
 
-    function updateBLocation() {
-      bLat += (Math.random() - 0.5) * 0.0005;
-      bLng += (Math.random() - 0.5) * 0.0005;
+    // จำลอง B ขยับ (แทน backend)
+    setInterval(() => {
+      bLat += (Math.random() - 0.5) * 0.0004;
+      bLng += (Math.random() - 0.5) * 0.0004;
       bMarker.setLatLng([bLat, bLng]);
-    }
-
-    setInterval(updateBLocation, 5000);
+    }, 5000);
 
     /* =========================
        4) Marker A (ผู้ใช้)
@@ -103,13 +114,12 @@
     let userLat = null;
     let userLng = null;
     let userMarker = null;
-    let routingControl = null;
 
     if (navigator.geolocation) {
       navigator.geolocation.watchPosition(
-        (position) => {
-          userLat = position.coords.latitude;
-          userLng = position.coords.longitude;
+        (pos) => {
+          userLat = pos.coords.latitude;
+          userLng = pos.coords.longitude;
 
           if (!userMarker) {
             userMarker = L.marker([userLat, userLng], { icon: userIcon })
@@ -129,42 +139,54 @@
     }
 
     /* =========================
-       5) ปุ่มโฟกัส A
+       5) ปุ่มโฟกัสตำแหน่ง A
     ========================= */
-    document.getElementById('focusUserBtn').addEventListener('click', () => {
+    document.getElementById('focusUserBtn').onclick = () => {
       if (userLat && userLng) {
         map.setView([userLat, userLng], 16);
       }
-    });
+    };
 
     /* =========================
-       6) ปุ่มนำทางไป B
+       6) นำทางในหน้าเดียว (OSRM)
     ========================= */
-    document.getElementById('navigateBtn').addEventListener('click', () => {
-  if (!userLat || !userLng) {
-    alert('ยังไม่พบตำแหน่งของคุณ');
-    return;
-  } 
+    let routingControl = null;
 
-  // ลบเส้นเก่า (ถ้ามี)
-  if (routingControl) {
-    map.removeControl(routingControl);
-  }
-  routingControl = L.Routing.control({
-    waypoints: [
-      L.latLng(userLat, userLng), // A
-      L.latLng(bLat, bLng)        // B
-    ],
-    routeWhileDragging: false,
-    addWaypoints: false,
-    draggableWaypoints: false,
-    show: false,                 // ไม่โชว์ panel
-    lineOptions: {
-      styles: [{ color: 'blue', weight: 5 }]
-    },
-    createMarker: () => null     // ไม่สร้าง marker ซ้ำ
-  }).addTo(map);
-});
+    document.getElementById('routeBtn').onclick = () => {
+      if (!userLat || !userLng) {
+        alert('ยังไม่พบตำแหน่งของคุณ');
+        return;
+      }
+
+      if (routingControl) {
+        map.removeControl(routingControl);
+      }
+
+      routingControl = L.Routing.control({
+        waypoints: [
+          L.latLng(userLat, userLng),
+          L.latLng(bLat, bLng)
+        ],
+        addWaypoints: false,
+        draggableWaypoints: false,
+        routeWhileDragging: false,
+        show: false,
+        lineOptions: {
+          styles: [{ color: 'blue', weight: 6 }]
+        },
+        createMarker: () => null
+      }).addTo(map);
+    };
+
+    /* =========================
+       7) ปิดการนำทาง
+    ========================= */
+    document.getElementById('clearRouteBtn').onclick = () => {
+      if (routingControl) {
+        map.removeControl(routingControl);
+        routingControl = null;
+      }
+    };
   </script>
 
 </body>
