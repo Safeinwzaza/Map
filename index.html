@@ -30,18 +30,38 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
-    // สร้างแผนที่
-    const map = L.map('map').setView([13.7563, 100.5018], 13);
+  // สร้างแผนที่
+  const map = L.map('map').setView([13.7563, 100.5018], 15);
 
-    // ใช้แผนที่จาก OpenStreetMap
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
+  // ใช้แผนที่จาก OpenStreetMap
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
 
-    // ปักหมุดตัวอย่าง (กรุงเทพ)
-    const marker = L.marker([13.7563, 100.5018]).addTo(map);
-    marker.bindPopup('ตำแหน่ง B').openPopup();
-  </script>
+  // ตำแหน่งเริ่มต้นของ B
+  let lat = 13.7563;
+  let lng = 100.5018;
+
+  // สร้าง marker แค่ครั้งเดียว
+  const marker = L.marker([lat, lng]).addTo(map);
+  marker.bindPopup('ตำแหน่ง B');
+
+  // ฟังก์ชันจำลองการเคลื่อนที่
+  function updateLocation() {
+    // ขยับนิด ๆ (เหมือนเดิน)
+    lat += (Math.random() - 0.5) * 0.001;
+    lng += (Math.random() - 0.5) * 0.001;
+
+    // ขยับ marker
+    marker.setLatLng([lat, lng]);
+
+    // ให้แผนที่ตาม marker
+    map.panTo([lat, lng]);
+  }
+
+  // อัปเดตทุก 5 วินาที
+  setInterval(updateLocation, 5000);
+</script>
 
 </body>
 </html>
