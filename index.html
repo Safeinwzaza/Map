@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <title>LIFF Map</title>
+  <meta charset="UTF-8" />
+  <title>LIFF Real-time Map</title>
 
   <!-- Leaflet CSS -->
   <link
@@ -11,18 +11,41 @@
   />
 
   <style>
-    body, html {
+    html, body {
       margin: 0;
       padding: 0;
       height: 100%;
     }
+
     #map {
       width: 100%;
       height: 100%;
     }
+
+    .map-btn {
+      position: absolute;
+      left: 10px;
+      z-index: 1000;
+      padding: 8px 12px;
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    #focusUserBtn {
+      top: 10px;
+    }
+
+    #navigateBtn {
+      top: 60px;
+    }
   </style>
 </head>
 <body>
+
+  <button id="focusUserBtn" class="map-btn">📍 กลับมาหาตำแหน่งฉัน</button>
+  <button id="navigateBtn" class="map-btn">🧭 นำทางไปหา B</button>
 
   <div id="map"></div>
 
@@ -30,59 +53,86 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
-  // สร้างแผนที่
-  const map = L.map('map').setView([13.7563, 100.5018], 15);
+    /* =========================
+       1) สร้างแผนที่
+    ========================= */
+    const map = L.map('map').setView([13.7563, 100.5018], 15);
 
-  // ใช้แผนที่จาก OpenStreetMap
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors'
-  }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
 
-  // ตำแหน่งเริ่มต้นของ B
-  let lat = 13.7563;
-  let lng = 100.5018;
+    /* =========================
+       2) ตำแหน่ง B (จำลอง)
+    ========================= */
+    let bLat = 13.7563;
+    let bLng = 100.5018;
 
-  // สร้าง marker แค่ครั้งเดียว
-  const marker = L.marker([lat, lng]).addTo(map);
-  marker.bindPopup('ตำแหน่ง B');
+    const bMarker = L.marker([bLat, bLng])
+      .addTo(map)
+      .bindPopup('ตำแหน่ง B');
 
-  // ฟังก์ชันจำลองการเคลื่อนที่
-  function updateLocation() {
-    // ขยับนิด ๆ (เหมือนเดิน)
-    lat += (Math.random() - 0.5) * 0.001;
-    lng += (Math.random() - 0.5) * 0.001;
+    function updateBLocation() {
+      bLat += (Math.random() - 0.5) * 0.001;
+      bLng += (Math.random() - 0.5) * 0.001;
+      bMarker.setLatLng([bLat, bLng]);
+    }
 
-    // ขยับ marker
-    marker.setLatLng([lat, lng]);
+    setInterval(updateBLocation, 5000);
 
-    // ให้แผนที่ตาม marker
-    map.panTo([lat, lng]);
-  }
+    /* =========================
+       3) ตำแหน่ง A (ผู้ใช้)
+    ========================= */
+    let userLat = null;
+    let userLng = null;
+    let userMarker = null;
 
-  // อัปเดตทุก 5 วินาที
-  setInterval(updateLocation, 5000);
-  // ขอพิกัดผู้ใช้ A
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      function (position) {
-        const userLat = position.coords.latitude;
-        const userLng = position.coords.longitude;
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition(
+        function (position) {
+          userLat = position.coords.latitude;
+          userLng = position.coords.longitude;
 
-        // marker ของ A
-        const userMarker = L.marker([userLat, userLng], {
-          title: 'ตำแหน่งของคุณ'
-        }).addTo(map);
+          if (!userMarker) {
+            userMarker = L.marker([userLat, userLng])
+              .addTo(map)
+              .bindPopup('ตำแหน่งของคุณ')
+              .openPopup();
+          } else {
+            userMarker.setLatLng([userLat, userLng]);
+          }
+        },
+        function () {
+          alert('ไม่สามารถเข้าถึงตำแหน่งของคุณได้');
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 5000,
+          timeout: 10000
+        }
+      );
+    } else {
+      alert('อุปกรณ์นี้ไม่รองรับ GPS');
+    }
 
-        userMarker.bindPopup('ตำแหน่งของคุณ').openPopup();
-      },
-      function (error) {
-        alert('ไม่สามารถเข้าถึงตำแหน่งของคุณได้');
+    /* =========================
+       4) ปุ่มกลับมาหาตำแหน่ง A
+    ========================= */
+    document.getElementById('focusUserBtn').addEventListener('click', () => {
+      if (userLat && userLng) {
+        map.setView([userLat, userLng], 16);
       }
-    );
-  } else {
-    alert('อุปกรณ์นี้ไม่รองรับ GPS');
-  }
-</script>
+    });
+
+    /* =========================
+       5) ปุ่มนำทางไปหา B
+    ========================= */
+    document.getElementById('navigateBtn').addEventListener('click', () => {
+      const url =
+        `https://www.google.com/maps/dir/?api=1&destination=${bLat},${bLng}`;
+      window.open(url, '_blank');
+    });
+  </script>
 
 </body>
 </html>
