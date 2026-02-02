@@ -15,7 +15,8 @@
       margin: 0;
       padding: 0;
       height: 100%;
-      font-family: sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f5f5f5;
     }
 
     #map {
@@ -23,48 +24,58 @@
       height: 100%;
     }
 
-    .map-btn {
+    /* Floating buttons (Google style) */
+    .fab {
       position: absolute;
-      left: 12px;
+      right: 14px;
       z-index: 1000;
-      padding: 14px 18px;
-      font-size: 16px;
-      background: #fff;
-      border: 2px solid #333;
-      border-radius: 12px;
-      cursor: pointer;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: white;
+      border: none;
       box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+      font-size: 20px;
+      cursor: pointer;
     }
 
-    #focusUserBtn { top: 12px; }
-    #routeBtn { top: 80px; }
-    #clearRouteBtn { top: 148px; }
+    #focusBtn { top: 16px; }
+    #routeBtn { top: 72px; }
+    #clearBtn { top: 128px; }
 
-    /* แถบระยะทาง */
-    #infoBox {
+    /* Bottom info card */
+    #infoCard {
       position: absolute;
-      right: 12px;
-      top: 12px;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
       z-index: 1000;
       background: white;
-      padding: 14px 18px;
-      border-radius: 12px;
-      border: 2px solid #333;
-      min-width: 180px;
-      box-shadow: 0 3px 8px rgba(0,0,0,0.3);
-      font-size: 15px;
+      border-radius: 16px;
+      padding: 14px 20px;
+      min-width: 260px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      text-align: center;
+      font-size: 16px;
+    }
+
+    #infoCard span {
+      display: block;
+      margin-top: 4px;
+      font-size: 14px;
+      color: #555;
     }
   </style>
 </head>
 <body>
 
-  <button id="focusUserBtn" class="map-btn">📍 กลับมาหาฉัน</button>
-  <button id="routeBtn" class="map-btn">🧭 เริ่มนำทาง</button>
-  <button id="clearRouteBtn" class="map-btn">❌ ปิดนำทาง</button>
+  <button id="focusBtn" class="fab">📍</button>
+  <button id="routeBtn" class="fab">🧭</button>
+  <button id="clearBtn" class="fab">✖</button>
 
-  <div id="infoBox">
-    <div><b>ระยะทาง:</b> -</div>
-    <div><b>เวลา:</b> -</div>
+  <div id="infoCard">
+    <b>ยังไม่เริ่มนำทาง</b>
+    <span>ระยะทาง - | เวลา -</span>
   </div>
 
   <div id="map"></div>
@@ -75,59 +86,50 @@
 
   <script>
     /* ======================
-       MAP
+       MAP (Google-like)
     ====================== */
-    const map = L.map('map').setView([16.7469, 100.1969], 15);
+    const map = L.map('map', { zoomControl: false })
+      .setView([16.7469, 100.1969], 15);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap'
-    }).addTo(map);
+    L.tileLayer(
+      'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+      { attribution: '© OpenStreetMap © CARTO' }
+    ).addTo(map);
+
+    map.setMinZoom(13);
+    map.setMaxZoom(18);
 
     /* ======================
-       ICONS
+       MARKERS (Circle style)
     ====================== */
-    const userIcon = L.icon({
-      iconUrl: 'https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png',
-      iconSize: [32, 32],
-      iconAnchor: [16, 32]
-    });
-
-    const bIcon = L.icon({
-      iconUrl: 'https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png',
-      iconSize: [32, 32],
-      iconAnchor: [16, 32]
-    });
-
-    /* ======================
-       MARKER B
-    ====================== */
+    let userLat, userLng;
     let bLat = 16.7479;
     let bLng = 100.1947;
 
-    const bMarker = L.marker([bLat, bLng], { icon: bIcon })
-      .addTo(map)
-      .bindPopup('ตำแหน่ง B');
+    const userMarker = L.circleMarker([0,0], {
+      radius: 8,
+      color: '#ffffff',
+      weight: 3,
+      fillColor: '#1A73E8',
+      fillOpacity: 1
+    }).addTo(map);
+
+    const bMarker = L.circleMarker([bLat, bLng], {
+      radius: 8,
+      color: '#ffffff',
+      weight: 3,
+      fillColor: '#EA4335',
+      fillOpacity: 1
+    }).addTo(map);
 
     /* ======================
-       MARKER A
+       GPS USER
     ====================== */
-    let userLat = null;
-    let userLng = null;
-    let userMarker = null;
-
     navigator.geolocation.watchPosition(pos => {
       userLat = pos.coords.latitude;
       userLng = pos.coords.longitude;
-
-      if (!userMarker) {
-        userMarker = L.marker([userLat, userLng], { icon: userIcon })
-          .addTo(map)
-          .bindPopup('ตำแหน่งของคุณ');
-      } else {
-        userMarker.setLatLng([userLat, userLng]);
-      }
-
-      updateRoute(); // A ขยับ → route ขยับ
+      userMarker.setLatLng([userLat, userLng]);
+      updateRoute();
     }, null, { enableHighAccuracy: true });
 
     /* ======================
@@ -135,35 +137,39 @@
     ====================== */
     let routingControl = null;
 
-    function startRouting() {
+    function startRoute() {
       if (!userLat || !userLng) return;
 
-      routingControl = L.Routing.control({
-        waypoints: [
-          L.latLng(userLat, userLng),
-          L.latLng(bLat, bLng)
-        ],
-        addWaypoints: false,
-        draggableWaypoints: false,
-        routeWhileDragging: false,
-        show: false,
-        createMarker: () => null,
-        lineOptions: {
-          styles: [{ color: 'blue', weight: 6 }]
-        }
-      }).addTo(map);
+      if (!routingControl) {
+        routingControl = L.Routing.control({
+          waypoints: [
+            L.latLng(userLat, userLng),
+            L.latLng(bLat, bLng)
+          ],
+          addWaypoints: false,
+          draggableWaypoints: false,
+          show: false,
+          createMarker: () => null,
+          lineOptions: {
+            styles: [
+              { color: '#666', weight: 8 },
+              { color: '#1A73E8', weight: 5 }
+            ]
+          }
+        }).addTo(map);
 
-      routingControl.on('routesfound', e => {
-        const route = e.routes[0];
-        document.getElementById('infoBox').innerHTML = `
-          <div><b>ระยะทาง:</b> ${(route.summary.totalDistance / 1000).toFixed(2)} กม.</div>
-          <div><b>เวลา:</b> ${(route.summary.totalTime / 60).toFixed(1)} นาที</div>
-        `;
-      });
+        routingControl.on('routesfound', e => {
+          const r = e.routes[0].summary;
+          document.getElementById('infoCard').innerHTML = `
+            <b>${(r.totalDistance/1000).toFixed(2)} กม.</b>
+            <span>ประมาณ ${(r.totalTime/60).toFixed(1)} นาที</span>
+          `;
+        });
+      }
     }
 
     function updateRoute() {
-      if (routingControl && userLat && userLng) {
+      if (routingControl) {
         routingControl.setWaypoints([
           L.latLng(userLat, userLng),
           L.latLng(bLat, bLng)
@@ -178,26 +184,26 @@
       bLat += (Math.random() - 0.5) * 0.0004;
       bLng += (Math.random() - 0.5) * 0.0004;
       bMarker.setLatLng([bLat, bLng]);
-      updateRoute(); // B ขยับ → route ขยับ
+      updateRoute();
     }, 5000);
 
     /* ======================
        BUTTONS
     ====================== */
-    document.getElementById('routeBtn').onclick = startRouting;
-
-    document.getElementById('clearRouteBtn').onclick = () => {
-      if (routingControl) {
-        map.removeControl(routingControl);
-        routingControl = null;
-        document.getElementById('infoBox').innerHTML =
-          `<div><b>ระยะทาง:</b> -</div><div><b>เวลา:</b> -</div>`;
+    document.getElementById('focusBtn').onclick = () => {
+      if (userLat && userLng) {
+        map.setView([userLat, userLng], 16);
       }
     };
 
-    document.getElementById('focusUserBtn').onclick = () => {
-      if (userLat && userLng) {
-        map.setView([userLat, userLng], 16);
+    document.getElementById('routeBtn').onclick = startRoute;
+
+    document.getElementById('clearBtn').onclick = () => {
+      if (routingControl) {
+        map.removeControl(routingControl);
+        routingControl = null;
+        document.getElementById('infoCard').innerHTML =
+          `<b>ปิดการนำทาง</b><span>ระยะทาง - | เวลา -</span>`;
       }
     };
   </script>
