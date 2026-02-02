@@ -15,7 +15,7 @@
       margin: 0;
       padding: 0;
       height: 100%;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: sans-serif;
     }
 
     #map {
@@ -23,61 +23,48 @@
       height: 100%;
     }
 
-    /* Floating buttons (ใหญ่ขึ้น) */
-    .fab {
+    .map-btn {
       position: absolute;
-      right: 18px;
+      left: 12px;
       z-index: 1000;
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      background: white;
-      border: none;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.35);
-      font-size: 26px;
-      cursor: pointer;
-    }
-
-    #focusBtn { top: 20px; }
-    #routeBtn { top: 100px; }
-    #clearBtn { top: 180px; }
-
-    /* Bottom info card (ใหญ่ + อ่านง่าย) */
-    #infoCard {
-      position: absolute;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 1000;
-      background: white;
-      border-radius: 20px;
-      padding: 18px 28px;
-      min-width: 300px;
-      box-shadow: 0 5px 14px rgba(0,0,0,0.3);
-      text-align: center;
-    }
-
-    #infoCard b {
-      font-size: 20px;
-    }
-
-    #infoCard span {
-      display: block;
-      margin-top: 6px;
+      padding: 14px 18px;
       font-size: 16px;
-      color: #444;
+      background: #fff;
+      border: 2px solid #333;
+      border-radius: 12px;
+      cursor: pointer;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+    }
+
+    #focusUserBtn { top: 12px; }
+    #routeBtn { top: 80px; }
+    #clearRouteBtn { top: 148px; }
+
+    /* แถบระยะทาง */
+    #infoBox {
+      position: absolute;
+      right: 12px;
+      top: 12px;
+      z-index: 1000;
+      background: white;
+      padding: 14px 18px;
+      border-radius: 12px;
+      border: 2px solid #333;
+      min-width: 180px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+      font-size: 15px;
     }
   </style>
 </head>
 <body>
 
-  <button id="focusBtn" class="fab">📍</button>
-  <button id="routeBtn" class="fab">🧭</button>
-  <button id="clearBtn" class="fab">✖</button>
+  <button id="focusUserBtn" class="map-btn">📍 กลับมาหาฉัน</button>
+  <button id="routeBtn" class="map-btn">🧭 เริ่มนำทาง</button>
+  <button id="clearRouteBtn" class="map-btn">❌ ปิดนำทาง</button>
 
-  <div id="infoCard">
-    <b>ยังไม่เริ่มนำทาง</b>
-    <span>ระยะทาง - | เวลา -</span>
+  <div id="infoBox">
+    <div><b>ระยะทาง:</b> -</div>
+    <div><b>เวลา:</b> -</div>
   </div>
 
   <div id="map"></div>
@@ -88,86 +75,91 @@
 
   <script>
     /* ======================
-       MAP (OSM ปกติ มีสี มีชื่อสถานที่)
+       MAP
     ====================== */
-    const map = L.map('map', { zoomControl: false })
-      .setView([16.7469, 100.1969], 15);
+    const map = L.map('map').setView([16.7469, 100.1969], 15);
 
-    L.tileLayer(
-      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      { attribution: '© OpenStreetMap contributors' }
-    ).addTo(map);
-
-    map.setMinZoom(13);
-    map.setMaxZoom(18);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
 
     /* ======================
-       MARKERS (Google-like circle)
+       ICONS
     ====================== */
-    let userLat, userLng;
+    const userIcon = L.icon({
+      iconUrl: 'https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png',
+      iconSize: [32, 32],
+      iconAnchor: [16, 32]
+    });
+
+    const bIcon = L.icon({
+      iconUrl: 'https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png',
+      iconSize: [32, 32],
+      iconAnchor: [16, 32]
+    });
+
+    /* ======================
+       MARKER B
+    ====================== */
     let bLat = 16.7479;
     let bLng = 100.1947;
 
-    const userMarker = L.circleMarker([0,0], {
-      radius: 10,
-      color: '#ffffff',
-      weight: 3,
-      fillColor: '#1A73E8',
-      fillOpacity: 1
-    }).addTo(map);
-
-    const bMarker = L.circleMarker([bLat, bLng], {
-      radius: 10,
-      color: '#ffffff',
-      weight: 3,
-      fillColor: '#EA4335',
-      fillOpacity: 1
-    }).addTo(map);
+    const bMarker = L.marker([bLat, bLng], { icon: bIcon })
+      .addTo(map)
+      .bindPopup('ตำแหน่ง B');
 
     /* ======================
-       GPS USER (A)
+       MARKER A
     ====================== */
+    let userLat = null;
+    let userLng = null;
+    let userMarker = null;
+
     navigator.geolocation.watchPosition(pos => {
       userLat = pos.coords.latitude;
       userLng = pos.coords.longitude;
-      userMarker.setLatLng([userLat, userLng]);
-      updateRoute();
+
+      if (!userMarker) {
+        userMarker = L.marker([userLat, userLng], { icon: userIcon })
+          .addTo(map)
+          .bindPopup('ตำแหน่งของคุณ');
+      } else {
+        userMarker.setLatLng([userLat, userLng]);
+      }
+
+      updateRoute(); // A ขยับ → route ขยับ
     }, null, { enableHighAccuracy: true });
 
     /* ======================
-       ROUTING (reroute realtime)
+       ROUTING
     ====================== */
     let routingControl = null;
 
-    function startRoute() {
+    function startRouting() {
       if (!userLat || !userLng) return;
 
-      if (!routingControl) {
-        routingControl = L.Routing.control({
-          waypoints: [
-            L.latLng(userLat, userLng),
-            L.latLng(bLat, bLng)
-          ],
-          addWaypoints: false,
-          draggableWaypoints: false,
-          show: false,
-          createMarker: () => null,
-          lineOptions: {
-            styles: [
-              { color: '#444', weight: 10 },
-              { color: '#1A73E8', weight: 6 }
-            ]
-          }
-        }).addTo(map);
+      routingControl = L.Routing.control({
+        waypoints: [
+          L.latLng(userLat, userLng),
+          L.latLng(bLat, bLng)
+        ],
+        addWaypoints: false,
+        draggableWaypoints: false,
+        routeWhileDragging: false,
+        show: false,
+        createMarker: () => null,
+        lineOptions: {
+          styles: [{ color: 'blue', weight: 6 }]
+        }
+      }).addTo(map);
 
-        routingControl.on('routesfound', e => {
-          const r = e.routes[0].summary;
-          document.getElementById('infoCard').innerHTML = `
-            <b>${(r.totalDistance / 1000).toFixed(2)} กม.</b>
-            <span>ประมาณ ${(r.totalTime / 60).toFixed(1)} นาที</span>
-          `;
-        });
-      }
+      routingControl.on('routesfound', e => {
+        const route = e.routes[0];
+        document.getElementById('infoBox').innerHTML = `
+          <div><b>ระยะทาง:</b> ${(route.summary.totalDistance / 1000).toFixed(2)} กม.</div>
+          <div><b>เวลา:</b> ${(route.summary.totalTime / 60).toFixed(1)} นาที</div>
+        `;
+      });
     }
 
     function updateRoute() {
@@ -186,26 +178,26 @@
       bLat += (Math.random() - 0.5) * 0.0004;
       bLng += (Math.random() - 0.5) * 0.0004;
       bMarker.setLatLng([bLat, bLng]);
-      updateRoute();
+      updateRoute(); // B ขยับ → route ขยับ
     }, 5000);
 
     /* ======================
        BUTTONS
     ====================== */
-    document.getElementById('focusBtn').onclick = () => {
-      if (userLat && userLng) {
-        map.setView([userLat, userLng], 16);
-      }
-    };
+    document.getElementById('routeBtn').onclick = startRouting;
 
-    document.getElementById('routeBtn').onclick = startRoute;
-
-    document.getElementById('clearBtn').onclick = () => {
+    document.getElementById('clearRouteBtn').onclick = () => {
       if (routingControl) {
         map.removeControl(routingControl);
         routingControl = null;
-        document.getElementById('infoCard').innerHTML =
-          `<b>ปิดการนำทาง</b><span>ระยะทาง - | เวลา -</span>`;
+        document.getElementById('infoBox').innerHTML =
+          `<div><b>ระยะทาง:</b> -</div><div><b>เวลา:</b> -</div>`;
+      }
+    };
+
+    document.getElementById('focusUserBtn').onclick = () => {
+      if (userLat && userLng) {
+        map.setView([userLat, userLng], 16);
       }
     };
   </script>
