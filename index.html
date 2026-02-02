@@ -103,6 +103,7 @@
     let userLat = null;
     let userLng = null;
     let userMarker = null;
+    let routingControl = null;
 
     if (navigator.geolocation) {
       navigator.geolocation.watchPosition(
@@ -139,19 +140,16 @@
     /* =========================
        6) ปุ่มนำทางไป B
     ========================= */
-    
-    let routingControl = null;
     document.getElementById('navigateBtn').addEventListener('click', () => {
   if (!userLat || !userLng) {
     alert('ยังไม่พบตำแหน่งของคุณ');
     return;
-  }
+  } 
 
   // ลบเส้นเก่า (ถ้ามี)
   if (routingControl) {
     map.removeControl(routingControl);
   }
-
   routingControl = L.Routing.control({
     waypoints: [
       L.latLng(userLat, userLng), // A
