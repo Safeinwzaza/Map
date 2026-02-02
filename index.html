@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <title>LIFF Real-time Map</title>
 
-  <!-- Leaflet CSS -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -24,21 +23,23 @@
 
     .map-btn {
       position: absolute;
-      left: 10px;
+      left: 12px;
       z-index: 1000;
-      padding: 8px 12px;
+      padding: 14px 18px;      /* ขยายปุ่ม */
+      font-size: 16px;         /* ตัวอักษรใหญ่ขึ้น */
       background: white;
-      border: 1px solid #ccc;
-      border-radius: 6px;
+      border: 2px solid #333;
+      border-radius: 10px;
       cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
 
     #focusUserBtn {
-      top: 10px;
+      top: 12px;
     }
 
     #navigateBtn {
-      top: 60px;
+      top: 80px;
     }
   </style>
 </head>
@@ -49,39 +50,53 @@
 
   <div id="map"></div>
 
-  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
     /* =========================
-       1) สร้างแผนที่
+       1) Map เริ่มต้น (พิษณุโลก)
     ========================= */
-    const map = L.map('map').setView([13.7563, 100.5018], 15);
+    const map = L.map('map').setView([16.7469, 100.1969], 15);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
     /* =========================
-       2) ตำแหน่ง B (จำลอง)
+       2) Icon แยกสี
     ========================= */
-    let bLat = 13.7563;
-    let bLng = 100.5018;
+    const userIcon = L.icon({
+      iconUrl: 'https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png',
+      iconSize: [32, 32],
+      iconAnchor: [16, 32]
+    });
 
-    const bMarker = L.marker([bLat, bLng])
+    const bIcon = L.icon({
+      iconUrl: 'https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png',
+      iconSize: [32, 32],
+      iconAnchor: [16, 32]
+    });
+
+    /* =========================
+       3) Marker B (มนเรศวร)
+    ========================= */
+    let bLat = 16.7479;  // มหาวิทยาลัยนเรศวร
+    let bLng = 100.1947;
+
+    const bMarker = L.marker([bLat, bLng], { icon: bIcon })
       .addTo(map)
-      .bindPopup('ตำแหน่ง B');
+      .bindPopup('ตำแหน่ง B (นเรศวร)');
 
     function updateBLocation() {
-      bLat += (Math.random() - 0.5) * 0.001;
-      bLng += (Math.random() - 0.5) * 0.001;
+      bLat += (Math.random() - 0.5) * 0.0005;
+      bLng += (Math.random() - 0.5) * 0.0005;
       bMarker.setLatLng([bLat, bLng]);
     }
 
     setInterval(updateBLocation, 5000);
 
     /* =========================
-       3) ตำแหน่ง A (ผู้ใช้)
+       4) Marker A (ผู้ใช้)
     ========================= */
     let userLat = null;
     let userLng = null;
@@ -89,34 +104,29 @@
 
     if (navigator.geolocation) {
       navigator.geolocation.watchPosition(
-        function (position) {
+        (position) => {
           userLat = position.coords.latitude;
           userLng = position.coords.longitude;
 
           if (!userMarker) {
-            userMarker = L.marker([userLat, userLng])
+            userMarker = L.marker([userLat, userLng], { icon: userIcon })
               .addTo(map)
-              .bindPopup('ตำแหน่งของคุณ')
-              .openPopup();
+              .bindPopup('ตำแหน่งของคุณ');
           } else {
             userMarker.setLatLng([userLat, userLng]);
           }
         },
-        function () {
-          alert('ไม่สามารถเข้าถึงตำแหน่งของคุณได้');
-        },
+        () => alert('ไม่สามารถเข้าถึงตำแหน่งของคุณได้'),
         {
           enableHighAccuracy: true,
           maximumAge: 5000,
           timeout: 10000
         }
       );
-    } else {
-      alert('อุปกรณ์นี้ไม่รองรับ GPS');
     }
 
     /* =========================
-       4) ปุ่มกลับมาหาตำแหน่ง A
+       5) ปุ่มโฟกัส A
     ========================= */
     document.getElementById('focusUserBtn').addEventListener('click', () => {
       if (userLat && userLng) {
@@ -125,7 +135,7 @@
     });
 
     /* =========================
-       5) ปุ่มนำทางไปหา B
+       6) ปุ่มนำทางไป B
     ========================= */
     document.getElementById('navigateBtn').addEventListener('click', () => {
       const url =
