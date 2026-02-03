@@ -1,207 +1,306 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-<title>Google Maps Navigation UI</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>LIFF Live Navigation</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
 
 <style>
 html, body {
   margin: 0;
+  padding: 0;
   height: 100%;
   font-family: system-ui, -apple-system, sans-serif;
 }
-#map { height: 100%; }
 
-/* ===== Top instruction ===== */
-#top {
-  position: absolute;
-  top: 14px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #1f5eff;
-  color: white;
-  padding: 12px 18px;
-  border-radius: 14px;
-  font-size: 16px;
-  box-shadow: 0 4px 12px rgba(0,0,0,.35);
-  z-index: 10;
-  display: none;
+#map {
+  width: 100%;
+  height: 100%;
 }
+
+/* ===== Buttons ===== */
+.map-btn {
+  position: absolute;
+  left: 14px;
+  z-index: 1000;
+  padding: 14px 18px;
+  font-size: 16px;
+  background: #fff;
+  border: 2px solid #222;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+}
+
+#focusUserBtn { top: 14px; }
+#focusBBtn    { top: 72px; }
+#routeBtn     { top: 130px; }
 
 /* ===== Bottom Sheet ===== */
-#bottom {
-  position: absolute;
-  bottom: 0;
+#bottomPanel {
+  position: fixed;
   left: 0;
   right: 0;
-  background: white;
-  border-radius: 22px 22px 0 0;
-  padding: 18px;
-  box-shadow: 0 -4px 14px rgba(0,0,0,.3);
-  z-index: 10;
-  display: none;
-}
-#bottom h3 {
-  margin: 0 0 6px;
-}
-#bottom .row {
-  font-size: 16px;
+  bottom: -260px;
+  background: #fff;
+  border-radius: 18px 18px 0 0;
+  padding: 18px 20px 24px;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.3);
+  z-index: 1200;
+  transition: bottom 0.3s ease;
 }
 
-/* ===== Floating Buttons ===== */
-.btn {
-  position: absolute;
-  right: 14px;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: white;
-  border: none;
-  font-size: 22px;
-  box-shadow: 0 3px 10px rgba(0,0,0,.3);
-  z-index: 10;
+#bottomPanel.show {
+  bottom: 0;
 }
-#loc { bottom: 160px; }
-#nav { bottom: 95px; background:#1f5eff; color:white; }
+
+#bottomPanel h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+#bottomPanel .item {
+  font-size: 16px;
+  margin-bottom: 6px;
+}
 </style>
 </head>
 
 <body>
 
-<div id="map"></div>
-<div id="top"></div>
+<button id="focusUserBtn" class="map-btn">📍</button>
+<button id="focusBBtn" class="map-btn">📌</button>
+<button id="routeBtn" class="map-btn">🧭 เริ่มนำทาง</button>
 
-<div id="bottom">
+<div id="bottomPanel">
   <h3>🧭 กำลังนำทาง</h3>
-  <div class="row" id="dist">ระยะทาง: -</div>
-  <div class="row" id="time">เวลา: -</div>
+  <div class="item" id="distance">ระยะทาง: -</div>
+  <div class="item" id="time">เวลา: -</div>
+  <div class="item" id="place">สถานที่: -</div>
 </div>
 
-<button id="loc" class="btn">📍</button>
-<button id="nav" class="btn">▶</button>
+<div id="map"></div>
 
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAzp3dsvPcpo6j91UXZn1lFn6zmyOfsv9A&libraries=geometry"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
 <script>
-let map, userMarker, destMarker;
-let directionsService, directionsRenderer;
-let steps = [], stepIndex = 0;
+/* ===== MAP ===== */
+const map = L.map('map').setView([16.7469, 100.1969], 15);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-/* ===== INIT MAP ===== */
-function init() {
-  map = new google.maps.Map(document.getElementById("map"), {
-    center: { lat: 16.7469, lng: 100.1969 },
-    zoom: 18,
-    tilt: 45,
-    heading: 0,
-    disableDefaultUI: true
-  });
+/* ===== STATE ===== */
+let routingControl = null;
+let isRouting = false;
+let autoFollow = true;
+let lastAutoMove = 0;
 
-  directionsService = new google.maps.DirectionsService();
-  directionsRenderer = new google.maps.DirectionsRenderer({
-    suppressMarkers: true,
-    polylineOptions: {
-      strokeColor: "#1f5eff",
-      strokeWeight: 6
-    }
-  });
-  directionsRenderer.setMap(map);
+/* ===== ICON B ===== */
+const bIcon = L.icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  shadowSize: [41, 41]
+});
 
-  /* Marker B (ปลายทาง) */
-  destMarker = new google.maps.Marker({
-    position: { lat: 16.7479, lng: 100.1947 },
-    map,
-    icon: "https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png"
-  });
-
-  trackUser();
-}
-
-/* ===== TRACK USER ===== */
-function trackUser() {
-  navigator.geolocation.watchPosition(p => {
-    const lat = p.coords.latitude;
-    const lng = p.coords.longitude;
-    const heading = p.coords.heading || 0;
-
-    const icon = {
-      path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-      scale: 6,
-      fillColor: "#1f5eff",
-      fillOpacity: 1,
-      strokeWeight: 2,
-      rotation: heading
-    };
-
-    if (!userMarker) {
-      userMarker = new google.maps.Marker({
-        position: { lat, lng },
-        map,
-        icon
-      });
-      map.setCenter({ lat, lng });
-    } else {
-      userMarker.setPosition({ lat, lng });
-      userMarker.setIcon(icon);
-    }
-
-    map.setHeading(heading);
-    checkStep(lat, lng);
-
-  }, null, { enableHighAccuracy: true });
-}
-
-/* ===== START NAVIGATION ===== */
-function startNav() {
-  directionsService.route({
-    origin: userMarker.getPosition(),
-    destination: destMarker.getPosition(),
-    travelMode: "DRIVING"
-  }, res => {
-    directionsRenderer.setDirections(res);
-
-    const leg = res.routes[0].legs[0];
-    steps = leg.steps;
-    stepIndex = 0;
-
-    document.getElementById("top").style.display = "block";
-    document.getElementById("bottom").style.display = "block";
-
-    document.getElementById("dist").innerText =
-      `ระยะทาง: ${(leg.distance.value/1000).toFixed(2)} กม.`;
-    document.getElementById("time").innerText =
-      `เวลา: ${(leg.duration.value/60).toFixed(1)} นาที`;
-
-    updateInstruction();
+/* ===== ICON A ===== */
+function createUserIcon(heading = 0) {
+  return L.divIcon({
+    className: '',
+    html: `
+      <div style="
+        width: 32px;
+        height: 32px;
+        transform: rotate(${heading}deg);
+        transition: transform 0.2s linear;
+      ">
+        <svg width="32" height="32" viewBox="0 0 100 100">
+          <!-- วงกลม -->
+          <circle cx="50" cy="50" r="20"
+            fill="#1e88ff"
+            stroke="white"
+            stroke-width="6"
+          />
+          <!-- หัวลูกศร -->
+          <polygon points="50,5 42,28 58,28"
+            fill="#1e88ff"
+          />
+        </svg>
+      </div>
+    `,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16]
   });
 }
 
-/* ===== TURN CHECK ===== */
-function checkStep(lat, lng) {
-  if (!steps[stepIndex]) return;
+/* ===== MARKERS ===== */
+let bLat = 16.7479, bLng = 100.1947;
+const bMarker = L.marker([bLat, bLng], { icon: bIcon }).addTo(map);
 
-  const d = google.maps.geometry.spherical.computeDistanceBetween(
-    new google.maps.LatLng(lat, lng),
-    steps[stepIndex].end_location
-  );
+let userLat, userLng, userMarker;
 
-  if (d < 20 && stepIndex < steps.length - 1) {
-    stepIndex++;
-    updateInstruction();
+/* ===== SIMULATE B MOVE ===== */
+setInterval(() => {
+  bLat += (Math.random() - 0.5) * 0.0003;
+  bLng += (Math.random() - 0.5) * 0.0003;
+  bMarker.setLatLng([bLat, bLng]);
+  if (routingControl) updateRoute();
+}, 5000);
+
+/* ===== STOP AUTO FOLLOW WHEN USER DRAGS ===== */
+map.on('dragstart zoomstart', () => autoFollow = false);
+
+/* ===== GEOLOCATION ===== */
+navigator.geolocation.watchPosition(pos => {
+  const lat = pos.coords.latitude;
+  const lng = pos.coords.longitude;
+  const speed = pos.coords.speed || 0;
+
+  let heading = headingSmooth;
+
+  if (lastLat !== null && lastLng !== null && speed > 0.4) {
+    const newHeading = calcHeading(lastLat, lastLng, lat, lng);
+    heading = smooth(headingSmooth, newHeading);
+  }
+
+  headingSmooth = heading;
+
+  if (!userMarker) {
+    userMarker = L.marker([lat, lng], {
+      icon: createUserIcon(headingSmooth)
+    }).addTo(map);
+  } else {
+    userMarker
+      .setLatLng([lat, lng])
+      .setIcon(createUserIcon(headingSmooth));
+  }
+
+  lastLat = lat;
+  lastLng = lng;
+
+  if (isRouting && autoFollow) {
+    map.panTo([lat, lng], { animate: true, duration: 0.6 });
+  }
+
+}, null, { enableHighAccuracy: true });
+
+/* ===== ROUTING ===== */
+async function getPlaceName() {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${bLat}&lon=${bLng}`
+    );
+    const data = await res.json();
+    return data.display_name || '-';
+  } catch {
+    return '-';
   }
 }
 
-function updateInstruction() {
-  const text = steps[stepIndex].instructions.replace(/<[^>]*>/g, "");
-  document.getElementById("top").innerText = text;
+function startRouting() {
+  if (!userLat || !userLng) return;
+
+  if (routingControl) map.removeControl(routingControl);
+
+  routingControl = L.Routing.control({
+    router: L.Routing.osrmv1({
+      serviceUrl: 'https://router.project-osrm.org/route/v1',
+      timeout: 10000
+    }),
+    waypoints: [
+      L.latLng(userLat, userLng),
+      L.latLng(bLat, bLng)
+    ],
+    addWaypoints: false,
+    draggableWaypoints: false,
+    routeWhileDragging: false,
+    fitSelectedRoutes: true,
+    show: false,
+    createMarker: () => null,
+    lineOptions: {
+      styles: [{ color: '#1e88ff', weight: 6, opacity: 0.9 }]
+    }
+  }).addTo(map);
+
+  routingControl.on('routesfound', e => {
+    const r = e.routes[0];
+
+    distance.innerText =
+      `ระยะทาง: ${(r.summary.totalDistance/1000).toFixed(2)} กม.`;
+    time.innerText =
+      `เวลา: ${(r.summary.totalTime/60).toFixed(1)} นาที`;
+
+    place.innerText = 'สถานที่: กำลังโหลด...';
+    bottomPanel.classList.add('show');
+
+    getPlaceName().then(name => {
+      place.innerText = `สถานที่: ${name}`;
+    });
+  });
+
+  routingControl.on('routingerror', () => {
+    alert('ไม่สามารถคำนวณเส้นทางได้');
+  });
+
+  isRouting = true;
+  autoFollow = true;
+  map.flyTo([userLat, userLng], 18, { animate: true, duration: 1 });
+}
+
+function stopRouting() {
+  if (routingControl) map.removeControl(routingControl);
+  routingControl = null;
+  bottomPanel.classList.remove('show');
+  isRouting = false;
+  autoFollow = false;
+}
+
+/* ===== UPDATE ROUTE ===== */
+function updateRoute() {
+  if (routingControl && userLat && userLng) {
+    routingControl.setWaypoints([
+      L.latLng(userLat, userLng),
+      L.latLng(bLat, bLng)
+    ]);
+  }
 }
 
 /* ===== BUTTONS ===== */
-nav.onclick = startNav;
-loc.onclick = () => userMarker && map.panTo(userMarker.getPosition());
+routeBtn.onclick = () => {
+  if (!isRouting) {
+    startRouting();
+    routeBtn.innerText = '❌ ปิดนำทาง';
+  } else {
+    stopRouting();
+    routeBtn.innerText = '🧭 เริ่มนำทาง';
+  }
+};
 
-init();
+focusUserBtn.onclick = () => userLat && map.setView([userLat, userLng], 17);
+focusBBtn.onclick = () => map.setView([bLat, bLng], 17);
+
+function calcHeading(lat1, lng1, lat2, lng2) {
+  const toRad = d => d * Math.PI / 180;
+  const y = Math.sin(toRad(lng2 - lng1)) * Math.cos(toRad(lat2));
+  const x =
+    Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+    Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.cos(toRad(lng2 - lng1));
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+let lastLat = null;
+let lastLng = null;
+let headingSmooth = 0;
+
+function smooth(prev, next, factor = 0.2) {
+  let diff = ((next - prev + 540) % 360) - 180;
+  return prev + diff * factor;
+}
 </script>
 
 </body>
