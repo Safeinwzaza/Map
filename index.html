@@ -54,6 +54,7 @@ html, body {
   font-size: 17px;
   line-height: 1.5;
 }
+
 </style>
 </head>
 
@@ -84,14 +85,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 /* ================= ICONS ================= */
-// A – ผู้ใช้
-const userIcon = L.icon({
-  iconUrl: 'https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png',
-  iconSize: [34, 34],
-  iconAnchor: [17, 34]
-});
-
-// B – pin ทรงสมมาตร (SVG)
+// B – pin แดง (ไม่อ้วน)
 const bIcon = L.icon({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
@@ -99,6 +93,38 @@ const bIcon = L.icon({
   iconAnchor: [12, 41],
   shadowSize: [41, 41]
 });
+
+/* ================= USER ICON ================= */
+function createUserIcon(heading = 0) {
+  return L.divIcon({
+    className: '',
+    html: `
+      <div style="
+        width: 26px;
+        height: 26px;
+        background: #1e88ff;
+        border: 4px solid white;
+        border-radius: 50%;
+        position: relative;
+        box-shadow: 0 0 8px rgba(0,0,0,0.4);
+      ">
+        <div style="
+          position: absolute;
+          top: -14px;
+          left: 50%;
+          transform: translateX(-50%) rotate(${heading}deg);
+          width: 0;
+          height: 0;
+          border-left: 6px solid transparent;
+          border-right: 6px solid transparent;
+          border-bottom: 14px solid #1e88ff;
+        "></div>
+      </div>
+    `,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15]
+  });
+}
 
 /* ================= MARKER B ================= */
 let bLat = 16.7479;
@@ -113,57 +139,64 @@ let userLat = null;
 let userLng = null;
 let userMarker = null;
 
-navigator.geolocation.watchPosition(pos => {
-  userLat = pos.coords.latitude;
-  userLng = pos.coords.longitude;
+/* ================= GEOLOCATION ================= */
+navigator.geolocation.watchPosition(
+  pos => {
+    userLat = pos.coords.latitude;
+    userLng = pos.coords.longitude;
+    const heading = pos.coords.heading || 0;
 
-  if (!userMarker) {
-    userMarker = L.marker([userLat, userLng], { icon: userIcon })
+    if (!userMarker) {
+      userMarker = L.marker(
+        [userLat, userLng],
+        { icon: createUserIcon(heading) }
+      )
       .addTo(map)
       .bindPopup('ตำแหน่งของคุณ (A)');
-  } else {
-    userMarker.setLatLng([userLat, userLng]);
-  }
+    } else {
+      userMarker
+        .setLatLng([userLat, userLng])
+        .setIcon(createUserIcon(heading));
+    }
 
-  updateRoute();
-}, null, { enableHighAccuracy: true });
+    updateRoute();
+  },
+  err => console.error(err),
+  { enableHighAccuracy: true }
+);
 
 /* ================= ROUTING ================= */
 let routingControl = null;
 
-async function getBPlaceName() {
-  const url =
-    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${bLat}&lon=${bLng}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  return data.display_name || 'ไม่ทราบชื่อสถานที่';
-}
-
-async function startRouting() {
+function startRouting() {
   if (!userLat || !userLng) return;
 
+  if (routingControl) map.removeControl(routingControl);
+
   routingControl = L.Routing.control({
+    router: L.Routing.osrmv1({
+      serviceUrl: 'https://router.project-osrm.org/route/v1'
+    }),
     waypoints: [
       L.latLng(userLat, userLng),
       L.latLng(bLat, bLng)
     ],
     addWaypoints: false,
     draggableWaypoints: false,
+    routeWhileDragging: true,
     show: false,
     createMarker: () => null,
     lineOptions: {
-      styles: [{ color: '#0066ff', weight: 7 }]
+      styles: [{ color: '#1e88ff', weight: 7, opacity: 0.9 }]
     }
   }).addTo(map);
-
-  const placeName = await getBPlaceName();
 
   routingControl.on('routesfound', e => {
     const r = e.routes[0];
     document.getElementById('infoBox').innerHTML = `
       <div><b>ระยะทาง:</b> ${(r.summary.totalDistance/1000).toFixed(2)} กม.</div>
       <div><b>เวลา:</b> ${(r.summary.totalTime/60).toFixed(1)} นาที</div>
-      <div><b>สถานที่ B:</b><br>${placeName}</div>
+      <div><b>สถานที่ B:</b> -</div>
     `;
   });
 }
