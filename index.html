@@ -38,7 +38,6 @@ html, body {
 #focusUserBtn { top: 14px; }
 #focusBBtn    { top: 72px; }
 #routeBtn     { top: 130px; }
-#clearRouteBtn{ top: 188px; }
 
 /* ===== Bottom Sheet ===== */
 #bottomPanel {
@@ -68,7 +67,6 @@ html, body {
   margin-bottom: 6px;
 }
 
-/* ===== Responsive (tablet / desktop) ===== */
 @media (min-width: 768px) {
   .map-btn {
     padding: 18px 22px;
@@ -110,6 +108,12 @@ html, body {
 /* ===== MAP ===== */
 const map = L.map('map').setView([16.7469, 100.1969], 15);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+/* ===== STATE ===== */
+let routingControl = null;
+let isRouting = false;
+let autoFollow = true;
+let lastAutoMove = 0;
 
 /* ===== ICON B (RED PIN) ===== */
 const bIcon = L.icon({
@@ -157,6 +161,11 @@ const bMarker = L.marker([bLat, bLng], { icon: bIcon }).addTo(map);
 
 let userLat, userLng, userMarker;
 
+/* ===== STOP AUTO FOLLOW WHEN USER DRAGS MAP ===== */
+map.on('dragstart zoomstart', () => {
+  autoFollow = false;
+});
+
 /* ===== GEOLOCATION ===== */
 navigator.geolocation.watchPosition(pos => {
   userLat = pos.coords.latitude;
@@ -173,12 +182,18 @@ navigator.geolocation.watchPosition(pos => {
   }
 
   updateRoute();
+
+  const now = Date.now();
+  if (isRouting && autoFollow && now - lastAutoMove > 1200) {
+    map.flyTo([userLat, userLng], 18, {
+      animate: true,
+      duration: 0.8
+    });
+    lastAutoMove = now;
+  }
 }, null, { enableHighAccuracy: true });
 
 /* ===== ROUTING ===== */
-let routingControl = null;
-let isRouting = false;
-
 async function getPlaceName() {
   const res = await fetch(
     `https://nominatim.openstreetmap.org/reverse?format=json&lat=${bLat}&lon=${bLng}`
@@ -210,17 +225,31 @@ function startRouting() {
 
   routingControl.on('routesfound', async e => {
     const r = e.routes[0];
-    document.getElementById('distance').innerText =
+    distance.innerText =
       `ระยะทาง: ${(r.summary.totalDistance/1000).toFixed(2)} กม.`;
-    document.getElementById('time').innerText =
+    time.innerText =
       `เวลา: ${(r.summary.totalTime/60).toFixed(1)} นาที`;
-    document.getElementById('place').innerText =
+    place.innerText =
       `สถานที่: ${await getPlaceName()}`;
-
-    document.getElementById('bottomPanel').classList.add('show');
+    bottomPanel.classList.add('show');
   });
+
+  isRouting = true;
+  autoFollow = true;
+  map.flyTo([userLat, userLng], 18, { animate: true, duration: 1 });
 }
 
+function stopRouting() {
+  if (routingControl) {
+    map.removeControl(routingControl);
+    routingControl = null;
+  }
+  bottomPanel.classList.remove('show');
+  isRouting = false;
+  autoFollow = false;
+}
+
+/* ===== UPDATE ROUTE ===== */
 function updateRoute() {
   if (routingControl && userLat && userLng) {
     routingControl.setWaypoints([
@@ -235,24 +264,10 @@ routeBtn.onclick = () => {
   if (!isRouting) {
     startRouting();
     routeBtn.innerText = '❌ ปิดนำทาง';
-    isRouting = true;
   } else {
-    if (routingControl) {
-      map.removeControl(routingControl);
-      routingControl = null;
-    }
-    document.getElementById('bottomPanel').classList.remove('show');
+    stopRouting();
     routeBtn.innerText = '🧭 เริ่มนำทาง';
-    isRouting = false;
   }
-};
-
-clearRouteBtn.onclick = () => {
-  if (routingControl) {
-    map.removeControl(routingControl);
-    routingControl = null;
-  }
-  document.getElementById('bottomPanel').classList.remove('show');
 };
 
 focusUserBtn.onclick = () => userLat && map.setView([userLat, userLng], 17);
