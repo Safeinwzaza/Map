@@ -21,40 +21,69 @@ html, body {
   height: 100%;
 }
 
-/* ปุ่ม */
+/* ===== Buttons ===== */
 .map-btn {
   position: absolute;
-  left: 16px;
+  left: 14px;
   z-index: 1000;
-  padding: 18px 22px;
-  font-size: 18px;
+  padding: 14px 18px;
+  font-size: 16px;
   background: #fff;
   border: 2px solid #222;
-  border-radius: 14px;
+  border-radius: 12px;
   cursor: pointer;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.3);
 }
 
-#focusUserBtn { top: 16px; }
-#focusBBtn    { top: 90px; }
-#routeBtn     { top: 164px; }
-#clearRouteBtn{ top: 238px; }
+#focusUserBtn { top: 14px; }
+#focusBBtn    { top: 72px; }
+#routeBtn     { top: 130px; }
+#clearRouteBtn{ top: 188px; }
 
-/* info box (ซ่อนไว้ก่อน) */
-#infoBox {
-  position: absolute;
-  right: 16px;
-  top: 16px;
-  z-index: 1000;
+/* ===== Bottom Sheet ===== */
+#bottomPanel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: -260px;
   background: #fff;
-  padding: 18px 22px;
-  border-radius: 14px;
-  border: 2px solid #222;
-  min-width: 260px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-  font-size: 17px;
-  line-height: 1.5;
-  display: none; /* ⭐ ซ่อนเริ่มต้น */
+  border-radius: 18px 18px 0 0;
+  padding: 18px 20px 24px;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.3);
+  z-index: 1200;
+  transition: bottom 0.3s ease;
+}
+
+#bottomPanel.show {
+  bottom: 0;
+}
+
+#bottomPanel h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+#bottomPanel .item {
+  font-size: 16px;
+  margin-bottom: 6px;
+}
+
+/* ===== Responsive (tablet / desktop) ===== */
+@media (min-width: 768px) {
+  .map-btn {
+    padding: 18px 22px;
+    font-size: 18px;
+  }
+  #bottomPanel {
+    max-width: 520px;
+    left: auto;
+    right: 20px;
+    bottom: -300px;
+    border-radius: 16px;
+  }
+  #bottomPanel.show {
+    bottom: 20px;
+  }
 }
 </style>
 </head>
@@ -66,100 +95,97 @@ html, body {
 <button id="routeBtn" class="map-btn">🧭 เริ่มนำทาง</button>
 <button id="clearRouteBtn" class="map-btn">❌ ปิดนำทาง</button>
 
-<div id="infoBox"></div>
+<div id="bottomPanel">
+  <h3>🧭 กำลังนำทาง</h3>
+  <div class="item" id="distance">ระยะทาง: -</div>
+  <div class="item" id="time">เวลา: -</div>
+  <div class="item" id="place">สถานที่: -</div>
+</div>
+
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
 <script>
-/* ================= MAP ================= */
+/* ===== MAP ===== */
 const map = L.map('map').setView([16.7469, 100.1969], 15);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© OpenStreetMap'
-}).addTo(map);
-
-/* ================= ICON B ================= */
+/* ===== ICON B (RED PIN) ===== */
 const bIcon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
   iconSize: [25, 41],
   iconAnchor: [12, 41],
   shadowSize: [41, 41]
 });
 
-/* ================= ICON A ================= */
+/* ===== ICON A ===== */
 function createUserIcon(heading = 0) {
   return L.divIcon({
     className: '',
     html: `
       <div style="
-        width: 26px;
-        height: 26px;
+        width: 24px;
+        height: 24px;
         background: #1e88ff;
         border: 4px solid white;
         border-radius: 50%;
         position: relative;
-        box-shadow: 0 0 8px rgba(0,0,0,0.4);
       ">
         <div style="
           position: absolute;
-          top: -14px;
+          top: -12px;
           left: 50%;
           transform: translateX(-50%) rotate(${heading}deg);
           width: 0;
           height: 0;
-          border-left: 6px solid transparent;
-          border-right: 6px solid transparent;
-          border-bottom: 14px solid #1e88ff;
+          border-left: 5px solid transparent;
+          border-right: 5px solid transparent;
+          border-bottom: 12px solid #1e88ff;
         "></div>
       </div>
     `,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15]
+    iconSize: [28, 28],
+    iconAnchor: [14, 14]
   });
 }
 
-/* ================= MARKER B ================= */
-let bLat = 16.7479;
-let bLng = 100.1947;
+/* ===== MARKERS ===== */
+let bLat = 16.7479, bLng = 100.1947;
+const bMarker = L.marker([bLat, bLng], { icon: bIcon }).addTo(map);
 
-const bMarker = L.marker([bLat, bLng], { icon: bIcon })
-  .addTo(map)
-  .bindPopup('ตำแหน่ง B');
+let userLat, userLng, userMarker;
 
-/* ================= MARKER A ================= */
-let userLat = null;
-let userLng = null;
-let userMarker = null;
+/* ===== GEOLOCATION ===== */
+navigator.geolocation.watchPosition(pos => {
+  userLat = pos.coords.latitude;
+  userLng = pos.coords.longitude;
+  const heading = pos.coords.heading || 0;
 
-/* ================= GEOLOCATION ================= */
-navigator.geolocation.watchPosition(
-  pos => {
-    userLat = pos.coords.latitude;
-    userLng = pos.coords.longitude;
-    const heading = pos.coords.heading || 0;
+  if (!userMarker) {
+    userMarker = L.marker([userLat, userLng], {
+      icon: createUserIcon(heading)
+    }).addTo(map);
+  } else {
+    userMarker.setLatLng([userLat, userLng])
+              .setIcon(createUserIcon(heading));
+  }
 
-    if (!userMarker) {
-      userMarker = L.marker(
-        [userLat, userLng],
-        { icon: createUserIcon(heading) }
-      ).addTo(map);
-    } else {
-      userMarker
-        .setLatLng([userLat, userLng])
-        .setIcon(createUserIcon(heading));
-    }
+  updateRoute();
+}, null, { enableHighAccuracy: true });
 
-    updateRoute();
-  },
-  err => console.error(err),
-  { enableHighAccuracy: true }
-);
-
-/* ================= ROUTING ================= */
+/* ===== ROUTING ===== */
 let routingControl = null;
+
+async function getPlaceName() {
+  const res = await fetch(
+    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${bLat}&lon=${bLng}`
+  );
+  const data = await res.json();
+  return data.display_name || '-';
+}
 
 function startRouting() {
   if (!userLat || !userLng) return;
@@ -175,25 +201,23 @@ function startRouting() {
       L.latLng(bLat, bLng)
     ],
     addWaypoints: false,
-    draggableWaypoints: false,
-    routeWhileDragging: true,
     show: false,
     createMarker: () => null,
     lineOptions: {
-      styles: [{ color: '#1e88ff', weight: 7, opacity: 0.9 }]
+      styles: [{ color: '#1e88ff', weight: 6 }]
     }
   }).addTo(map);
 
-  routingControl.on('routesfound', e => {
+  routingControl.on('routesfound', async e => {
     const r = e.routes[0];
+    document.getElementById('distance').innerText =
+      `ระยะทาง: ${(r.summary.totalDistance/1000).toFixed(2)} กม.`;
+    document.getElementById('time').innerText =
+      `เวลา: ${(r.summary.totalTime/60).toFixed(1)} นาที`;
+    document.getElementById('place').innerText =
+      `สถานที่: ${await getPlaceName()}`;
 
-    const infoBox = document.getElementById('infoBox');
-    infoBox.style.display = 'block'; // ⭐ แสดงตอนเริ่มนำทาง
-    infoBox.innerHTML = `
-      <div><b>ระยะทาง:</b> ${(r.summary.totalDistance/1000).toFixed(2)} กม.</div>
-      <div><b>เวลา:</b> ${(r.summary.totalTime/60).toFixed(1)} นาที</div>
-      <div><b>สถานที่:</b> ตำแหน่ง B</div>
-    `;
+    document.getElementById('bottomPanel').classList.add('show');
   });
 }
 
@@ -206,32 +230,19 @@ function updateRoute() {
   }
 }
 
-/* ================= SIMULATE B MOVE ================= */
-setInterval(() => {
-  bLat += (Math.random() - 0.5) * 0.0004;
-  bLng += (Math.random() - 0.5) * 0.0004;
-  bMarker.setLatLng([bLat, bLng]);
-  updateRoute();
-}, 5000);
+/* ===== BUTTONS ===== */
+routeBtn.onclick = startRouting;
 
-/* ================= BUTTONS ================= */
-document.getElementById('routeBtn').onclick = startRouting;
-
-document.getElementById('clearRouteBtn').onclick = () => {
+clearRouteBtn.onclick = () => {
   if (routingControl) {
     map.removeControl(routingControl);
     routingControl = null;
   }
-  document.getElementById('infoBox').style.display = 'none'; // ⭐ ซ่อนกลับ
+  document.getElementById('bottomPanel').classList.remove('show');
 };
 
-document.getElementById('focusUserBtn').onclick = () => {
-  if (userLat && userLng) map.setView([userLat, userLng], 17);
-};
-
-document.getElementById('focusBBtn').onclick = () => {
-  map.setView([bLat, bLng], 17);
-};
+focusUserBtn.onclick = () => userLat && map.setView([userLat, userLng], 17);
+focusBBtn.onclick = () => map.setView([bLat, bLng], 17);
 </script>
 
 </body>
