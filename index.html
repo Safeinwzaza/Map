@@ -113,28 +113,27 @@ function createUserIcon(heading = 0) {
     className: '',
     html: `
       <div style="
-        width: 24px;
-        height: 24px;
-        background: #1e88ff;
-        border: 4px solid white;
-        border-radius: 50%;
-        position: relative;
+        width: 32px;
+        height: 32px;
+        transform: rotate(${heading}deg);
+        transition: transform 0.2s linear;
       ">
-        <div style="
-          position: absolute;
-          top: -12px;
-          left: 50%;
-          transform: translateX(-50%) rotate(${heading}deg);
-          width: 0;
-          height: 0;
-          border-left: 5px solid transparent;
-          border-right: 5px solid transparent;
-          border-bottom: 12px solid #1e88ff;
-        "></div>
+        <svg width="32" height="32" viewBox="0 0 100 100">
+          <!-- วงกลม -->
+          <circle cx="50" cy="50" r="20"
+            fill="#1e88ff"
+            stroke="white"
+            stroke-width="6"
+          />
+          <!-- หัวลูกศร -->
+          <polygon points="50,5 42,28 58,28"
+            fill="#1e88ff"
+          />
+        </svg>
       </div>
     `,
-    iconSize: [28, 28],
-    iconAnchor: [14, 14]
+    iconSize: [32, 32],
+    iconAnchor: [16, 16]
   });
 }
 
@@ -161,31 +160,30 @@ navigator.geolocation.watchPosition(pos => {
   const lng = pos.coords.longitude;
   const speed = pos.coords.speed || 0;
 
-  let heading;
+  let heading = headingSmooth;
 
-  if (lastLat !== null && lastLng !== null && speed > 0.5) {
-    heading = calculateHeading(lastLat, lastLng, lat, lng);
-  } else {
-    heading = smoothHeading; // อย่าหมุนถ้าไม่ขยับ
+  if (lastLat !== null && lastLng !== null && speed > 0.4) {
+    const newHeading = calcHeading(lastLat, lastLng, lat, lng);
+    heading = smooth(headingSmooth, newHeading);
   }
 
-  smoothHeading = smoothRotate(smoothHeading, heading);
+  headingSmooth = heading;
 
   if (!userMarker) {
     userMarker = L.marker([lat, lng], {
-      icon: createUserIcon(smoothHeading)
+      icon: createUserIcon(headingSmooth)
     }).addTo(map);
   } else {
     userMarker
       .setLatLng([lat, lng])
-      .setIcon(createUserIcon(smoothHeading));
+      .setIcon(createUserIcon(headingSmooth));
   }
 
   lastLat = lat;
   lastLng = lng;
 
   if (isRouting && autoFollow) {
-    map.panTo([lat, lng], { animate: true, duration: 0.5 });
+    map.panTo([lat, lng], { animate: true, duration: 0.6 });
   }
 
 }, null, { enableHighAccuracy: true });
@@ -285,25 +283,21 @@ routeBtn.onclick = () => {
 focusUserBtn.onclick = () => userLat && map.setView([userLat, userLng], 17);
 focusBBtn.onclick = () => map.setView([bLat, bLng], 17);
 
-function calculateHeading(lat1, lng1, lat2, lng2) {
+function calcHeading(lat1, lng1, lat2, lng2) {
   const toRad = d => d * Math.PI / 180;
-  const toDeg = r => r * 180 / Math.PI;
-
-  const dLng = toRad(lng2 - lng1);
-  const y = Math.sin(dLng) * Math.cos(toRad(lat2));
+  const y = Math.sin(toRad(lng2 - lng1)) * Math.cos(toRad(lat2));
   const x =
     Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
-    Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLng);
-
-  let brng = toDeg(Math.atan2(y, x));
-  return (brng + 360) % 360;
+    Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.cos(toRad(lng2 - lng1));
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
 let lastLat = null;
 let lastLng = null;
-let smoothHeading = 0;
+let headingSmooth = 0;
 
-function smoothRotate(prev, next, factor = 0.15) {
+function smooth(prev, next, factor = 0.2) {
   let diff = ((next - prev + 540) % 360) - 180;
   return prev + diff * factor;
 }
