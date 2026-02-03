@@ -66,23 +66,6 @@ html, body {
   font-size: 16px;
   margin-bottom: 6px;
 }
-
-@media (min-width: 768px) {
-  .map-btn {
-    padding: 18px 22px;
-    font-size: 18px;
-  }
-  #bottomPanel {
-    max-width: 520px;
-    left: auto;
-    right: 20px;
-    bottom: -300px;
-    border-radius: 16px;
-  }
-  #bottomPanel.show {
-    bottom: 20px;
-  }
-}
 </style>
 </head>
 
@@ -115,7 +98,7 @@ let isRouting = false;
 let autoFollow = true;
 let lastAutoMove = 0;
 
-/* ===== ICON B (RED PIN) ===== */
+/* ===== ICON B ===== */
 const bIcon = L.icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
@@ -165,19 +148,12 @@ let userLat, userLng, userMarker;
 setInterval(() => {
   bLat += (Math.random() - 0.5) * 0.0003;
   bLng += (Math.random() - 0.5) * 0.0003;
-
   bMarker.setLatLng([bLat, bLng]);
-
-  // ถ้ากำลังนำทาง ให้ route ขยับตาม
-  if (routingControl) {
-    updateRoute();
-  }
+  if (routingControl) updateRoute();
 }, 5000);
 
-/* ===== STOP AUTO FOLLOW WHEN USER DRAGS MAP ===== */
-map.on('dragstart zoomstart', () => {
-  autoFollow = false;
-});
+/* ===== STOP AUTO FOLLOW WHEN USER DRAGS ===== */
+map.on('dragstart zoomstart', () => autoFollow = false);
 
 /* ===== GEOLOCATION ===== */
 navigator.geolocation.watchPosition(pos => {
@@ -198,21 +174,22 @@ navigator.geolocation.watchPosition(pos => {
 
   const now = Date.now();
   if (isRouting && autoFollow && now - lastAutoMove > 1200) {
-    map.flyTo([userLat, userLng], 18, {
-      animate: true,
-      duration: 0.8
-    });
+    map.flyTo([userLat, userLng], 18, { animate: true, duration: 0.8 });
     lastAutoMove = now;
   }
 }, null, { enableHighAccuracy: true });
 
 /* ===== ROUTING ===== */
 async function getPlaceName() {
-  const res = await fetch(
-    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${bLat}&lon=${bLng}`
-  );
-  const data = await res.json();
-  return data.display_name || '-';
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${bLat}&lon=${bLng}`
+    );
+    const data = await res.json();
+    return data.display_name || '-';
+  } catch {
+    return '-';
+  }
 }
 
 function startRouting() {
@@ -222,29 +199,42 @@ function startRouting() {
 
   routingControl = L.Routing.control({
     router: L.Routing.osrmv1({
-      serviceUrl: 'https://router.project-osrm.org/route/v1'
+      serviceUrl: 'https://router.project-osrm.org/route/v1',
+      timeout: 10000
     }),
     waypoints: [
       L.latLng(userLat, userLng),
       L.latLng(bLat, bLng)
     ],
     addWaypoints: false,
+    draggableWaypoints: false,
+    routeWhileDragging: false,
+    fitSelectedRoutes: true,
     show: false,
     createMarker: () => null,
     lineOptions: {
-      styles: [{ color: '#1e88ff', weight: 6 }]
+      styles: [{ color: '#1e88ff', weight: 6, opacity: 0.9 }]
     }
   }).addTo(map);
 
-  routingControl.on('routesfound', async e => {
+  routingControl.on('routesfound', e => {
     const r = e.routes[0];
+
     distance.innerText =
       `ระยะทาง: ${(r.summary.totalDistance/1000).toFixed(2)} กม.`;
     time.innerText =
       `เวลา: ${(r.summary.totalTime/60).toFixed(1)} นาที`;
-    place.innerText =
-      `สถานที่: ${await getPlaceName()}`;
+
+    place.innerText = 'สถานที่: กำลังโหลด...';
     bottomPanel.classList.add('show');
+
+    getPlaceName().then(name => {
+      place.innerText = `สถานที่: ${name}`;
+    });
+  });
+
+  routingControl.on('routingerror', () => {
+    alert('ไม่สามารถคำนวณเส้นทางได้');
   });
 
   isRouting = true;
@@ -253,10 +243,8 @@ function startRouting() {
 }
 
 function stopRouting() {
-  if (routingControl) {
-    map.removeControl(routingControl);
-    routingControl = null;
-  }
+  if (routingControl) map.removeControl(routingControl);
+  routingControl = null;
   bottomPanel.classList.remove('show');
   isRouting = false;
   autoFollow = false;
