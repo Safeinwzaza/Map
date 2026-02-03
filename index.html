@@ -90,10 +90,9 @@ html, body {
 
 <body>
 
-<button id="focusUserBtn" class="map-btn">📍 ไป A</button>
-<button id="focusBBtn" class="map-btn">📌 ไป B</button>
+<button id="focusUserBtn" class="map-btn">📍</button>
+<button id="focusBBtn" class="map-btn">📌</button>
 <button id="routeBtn" class="map-btn">🧭 เริ่มนำทาง</button>
-<button id="clearRouteBtn" class="map-btn">❌ ปิดนำทาง</button>
 
 <div id="bottomPanel">
   <h3>🧭 กำลังนำทาง</h3>
@@ -178,6 +177,7 @@ navigator.geolocation.watchPosition(pos => {
 
 /* ===== ROUTING ===== */
 let routingControl = null;
+let isRouting = false;
 
 async function getPlaceName() {
   const res = await fetch(
@@ -231,7 +231,21 @@ function updateRoute() {
 }
 
 /* ===== BUTTONS ===== */
-routeBtn.onclick = startRouting;
+routeBtn.onclick = () => {
+  if (!isRouting) {
+    startRouting();
+    routeBtn.innerText = '❌ ปิดนำทาง';
+    isRouting = true;
+  } else {
+    if (routingControl) {
+      map.removeControl(routingControl);
+      routingControl = null;
+    }
+    document.getElementById('bottomPanel').classList.remove('show');
+    routeBtn.innerText = '🧭 เริ่มนำทาง';
+    isRouting = false;
+  }
+};
 
 clearRouteBtn.onclick = () => {
   if (routingControl) {
