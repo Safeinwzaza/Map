@@ -161,6 +161,19 @@ const bMarker = L.marker([bLat, bLng], { icon: bIcon }).addTo(map);
 
 let userLat, userLng, userMarker;
 
+/* ===== SIMULATE B MOVE ===== */
+setInterval(() => {
+  bLat += (Math.random() - 0.5) * 0.0003;
+  bLng += (Math.random() - 0.5) * 0.0003;
+
+  bMarker.setLatLng([bLat, bLng]);
+
+  // ถ้ากำลังนำทาง ให้ route ขยับตาม
+  if (routingControl) {
+    updateRoute();
+  }
+}, 5000);
+
 /* ===== STOP AUTO FOLLOW WHEN USER DRAGS MAP ===== */
 map.on('dragstart zoomstart', () => {
   autoFollow = false;
