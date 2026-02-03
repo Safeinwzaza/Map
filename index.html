@@ -1,103 +1,98 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Google Maps Navigation Clone</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Google Maps Navigation UI</title>
 
 <style>
 html, body {
   margin: 0;
-  padding: 0;
   height: 100%;
   font-family: system-ui, -apple-system, sans-serif;
 }
+#map { height: 100%; }
 
-#map {
-  height: 100%;
-  width: 100%;
-}
-
-/* ===== Top Card ===== */
-#topCard {
+/* ===== Top instruction ===== */
+#top {
   position: absolute;
-  top: 12px;
+  top: 14px;
   left: 50%;
   transform: translateX(-50%);
-  background: white;
-  padding: 12px 16px;
+  background: #1f5eff;
+  color: white;
+  padding: 12px 18px;
   border-radius: 14px;
-  box-shadow: 0 4px 12px rgba(0,0,0,.25);
+  font-size: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.35);
   z-index: 10;
-  font-size: 15px;
   display: none;
 }
 
 /* ===== Bottom Sheet ===== */
-#bottomSheet {
+#bottom {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
   background: white;
-  border-radius: 18px 18px 0 0;
+  border-radius: 22px 22px 0 0;
   padding: 18px;
-  box-shadow: 0 -4px 12px rgba(0,0,0,.3);
+  box-shadow: 0 -4px 14px rgba(0,0,0,.3);
   z-index: 10;
   display: none;
 }
-
-#bottomSheet h3 {
+#bottom h3 {
   margin: 0 0 6px;
 }
+#bottom .row {
+  font-size: 16px;
+}
 
+/* ===== Floating Buttons ===== */
 .btn {
   position: absolute;
   right: 14px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
   background: white;
   border: none;
-  border-radius: 50%;
-  padding: 14px;
-  box-shadow: 0 3px 8px rgba(0,0,0,.3);
-  font-size: 18px;
+  font-size: 22px;
+  box-shadow: 0 3px 10px rgba(0,0,0,.3);
   z-index: 10;
 }
-
-#locBtn { bottom: 150px; }
-#navBtn { bottom: 90px; }
+#loc { bottom: 160px; }
+#nav { bottom: 95px; background:#1f5eff; color:white; }
 </style>
 </head>
 
 <body>
 
 <div id="map"></div>
+<div id="top"></div>
 
-<div id="topCard"></div>
-
-<div id="bottomSheet">
-  <h3 id="summary">กำลังนำทาง</h3>
-  <div id="distance">ระยะทาง: -</div>
-  <div id="time">เวลา: -</div>
+<div id="bottom">
+  <h3>🧭 กำลังนำทาง</h3>
+  <div class="row" id="dist">ระยะทาง: -</div>
+  <div class="row" id="time">เวลา: -</div>
 </div>
 
-<button id="locBtn" class="btn">📍</button>
-<button id="navBtn" class="btn">🧭</button>
+<button id="loc" class="btn">📍</button>
+<button id="nav" class="btn">▶</button>
 
-<script
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAzp3dsvPcpo6j91UXZn1lFn6zmyOfsv9A&libraries=geometry">
-</script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAzp3dsvPcpo6j91UXZn1lFn6zmyOfsv9A&libraries=geometry"></script>
 
 <script>
-let map, userMarker, destMarker, directionsService, directionsRenderer;
-let watchId;
-let steps = [];
-let stepIndex = 0;
+let map, userMarker, destMarker;
+let directionsService, directionsRenderer;
+let steps = [], stepIndex = 0;
 
 /* ===== INIT MAP ===== */
-function initMap() {
+function init() {
   map = new google.maps.Map(document.getElementById("map"), {
     center: { lat: 16.7469, lng: 100.1969 },
-    zoom: 17,
+    zoom: 18,
     tilt: 45,
     heading: 0,
     disableDefaultUI: true
@@ -107,13 +102,13 @@ function initMap() {
   directionsRenderer = new google.maps.DirectionsRenderer({
     suppressMarkers: true,
     polylineOptions: {
-      strokeColor: "#1e88ff",
+      strokeColor: "#1f5eff",
       strokeWeight: 6
     }
   });
   directionsRenderer.setMap(map);
 
-  /* Destination B */
+  /* Marker B (ปลายทาง) */
   destMarker = new google.maps.Marker({
     position: { lat: 16.7479, lng: 100.1947 },
     map,
@@ -123,47 +118,42 @@ function initMap() {
   trackUser();
 }
 
-/* ===== USER TRACKING ===== */
+/* ===== TRACK USER ===== */
 function trackUser() {
-  watchId = navigator.geolocation.watchPosition(pos => {
-    const lat = pos.coords.latitude;
-    const lng = pos.coords.longitude;
-    const heading = pos.coords.heading || 0;
+  navigator.geolocation.watchPosition(p => {
+    const lat = p.coords.latitude;
+    const lng = p.coords.longitude;
+    const heading = p.coords.heading || 0;
+
+    const icon = {
+      path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+      scale: 6,
+      fillColor: "#1f5eff",
+      fillOpacity: 1,
+      strokeWeight: 2,
+      rotation: heading
+    };
 
     if (!userMarker) {
       userMarker = new google.maps.Marker({
         position: { lat, lng },
         map,
-        icon: {
-          path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-          scale: 5,
-          fillColor: "#1e88ff",
-          fillOpacity: 1,
-          strokeWeight: 2,
-          rotation: heading
-        }
+        icon
       });
       map.setCenter({ lat, lng });
     } else {
       userMarker.setPosition({ lat, lng });
-      userMarker.setIcon({
-        path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-        scale: 5,
-        fillColor: "#1e88ff",
-        fillOpacity: 1,
-        strokeWeight: 2,
-        rotation: heading
-      });
+      userMarker.setIcon(icon);
     }
 
     map.setHeading(heading);
-
     checkStep(lat, lng);
+
   }, null, { enableHighAccuracy: true });
 }
 
-/* ===== START NAV ===== */
-function startNavigation() {
+/* ===== START NAVIGATION ===== */
+function startNav() {
   directionsService.route({
     origin: userMarker.getPosition(),
     destination: destMarker.getPosition(),
@@ -175,54 +165,43 @@ function startNavigation() {
     steps = leg.steps;
     stepIndex = 0;
 
-    document.getElementById("topCard").style.display = "block";
-    document.getElementById("bottomSheet").style.display = "block";
+    document.getElementById("top").style.display = "block";
+    document.getElementById("bottom").style.display = "block";
 
-    document.getElementById("distance").innerText =
+    document.getElementById("dist").innerText =
       `ระยะทาง: ${(leg.distance.value/1000).toFixed(2)} กม.`;
     document.getElementById("time").innerText =
       `เวลา: ${(leg.duration.value/60).toFixed(1)} นาที`;
 
-    speak(stripHtml(steps[0].instructions));
+    updateInstruction();
   });
 }
 
-/* ===== CHECK TURN ===== */
+/* ===== TURN CHECK ===== */
 function checkStep(lat, lng) {
   if (!steps[stepIndex]) return;
 
-  const dist = google.maps.geometry.spherical.computeDistanceBetween(
+  const d = google.maps.geometry.spherical.computeDistanceBetween(
     new google.maps.LatLng(lat, lng),
     steps[stepIndex].end_location
   );
 
-  if (dist < 20 && stepIndex < steps.length - 1) {
+  if (d < 20 && stepIndex < steps.length - 1) {
     stepIndex++;
-    const text = stripHtml(steps[stepIndex].instructions);
-    document.getElementById("topCard").innerText = text;
-    speak(text);
+    updateInstruction();
   }
 }
 
-/* ===== SPEECH ===== */
-function speak(text) {
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = "th-TH";
-  speechSynthesis.cancel();
-  speechSynthesis.speak(u);
-}
-
-function stripHtml(html) {
-  return html.replace(/<[^>]*>/g, "");
+function updateInstruction() {
+  const text = steps[stepIndex].instructions.replace(/<[^>]*>/g, "");
+  document.getElementById("top").innerText = text;
 }
 
 /* ===== BUTTONS ===== */
-navBtn.onclick = startNavigation;
-locBtn.onclick = () => {
-  if (userMarker) map.panTo(userMarker.getPosition());
-};
+nav.onclick = startNav;
+loc.onclick = () => userMarker && map.panTo(userMarker.getPosition());
 
-initMap();
+init();
 </script>
 
 </body>
