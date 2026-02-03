@@ -157,26 +157,37 @@ map.on('dragstart zoomstart', () => autoFollow = false);
 
 /* ===== GEOLOCATION ===== */
 navigator.geolocation.watchPosition(pos => {
-  userLat = pos.coords.latitude;
-  userLng = pos.coords.longitude;
-  const heading = pos.coords.heading || 0;
+  const lat = pos.coords.latitude;
+  const lng = pos.coords.longitude;
+  const speed = pos.coords.speed || 0;
+
+  let heading;
+
+  if (lastLat !== null && lastLng !== null && speed > 0.5) {
+    heading = calculateHeading(lastLat, lastLng, lat, lng);
+  } else {
+    heading = smoothHeading; // อย่าหมุนถ้าไม่ขยับ
+  }
+
+  smoothHeading = smoothRotate(smoothHeading, heading);
 
   if (!userMarker) {
-    userMarker = L.marker([userLat, userLng], {
-      icon: createUserIcon(heading)
+    userMarker = L.marker([lat, lng], {
+      icon: createUserIcon(smoothHeading)
     }).addTo(map);
   } else {
-    userMarker.setLatLng([userLat, userLng])
-              .setIcon(createUserIcon(heading));
+    userMarker
+      .setLatLng([lat, lng])
+      .setIcon(createUserIcon(smoothHeading));
   }
 
-  updateRoute();
+  lastLat = lat;
+  lastLng = lng;
 
-  const now = Date.now();
-  if (isRouting && autoFollow && now - lastAutoMove > 1200) {
-    map.flyTo([userLat, userLng], 18, { animate: true, duration: 0.8 });
-    lastAutoMove = now;
+  if (isRouting && autoFollow) {
+    map.panTo([lat, lng], { animate: true, duration: 0.5 });
   }
+
 }, null, { enableHighAccuracy: true });
 
 /* ===== ROUTING ===== */
@@ -273,6 +284,29 @@ routeBtn.onclick = () => {
 
 focusUserBtn.onclick = () => userLat && map.setView([userLat, userLng], 17);
 focusBBtn.onclick = () => map.setView([bLat, bLng], 17);
+
+function calculateHeading(lat1, lng1, lat2, lng2) {
+  const toRad = d => d * Math.PI / 180;
+  const toDeg = r => r * 180 / Math.PI;
+
+  const dLng = toRad(lng2 - lng1);
+  const y = Math.sin(dLng) * Math.cos(toRad(lat2));
+  const x =
+    Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+    Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLng);
+
+  let brng = toDeg(Math.atan2(y, x));
+  return (brng + 360) % 360;
+}
+
+let lastLat = null;
+let lastLng = null;
+let smoothHeading = 0;
+
+function smoothRotate(prev, next, factor = 0.15) {
+  let diff = ((next - prev + 540) % 360) - 180;
+  return prev + diff * factor;
+}
 </script>
 
 </body>
