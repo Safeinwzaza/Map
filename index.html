@@ -2,6 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <title>LIFF Live Navigation</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -39,7 +40,7 @@ html, body {
 #routeBtn     { top: 164px; }
 #clearRouteBtn{ top: 238px; }
 
-/* info box */
+/* info box (ซ่อนไว้ก่อน) */
 #infoBox {
   position: absolute;
   right: 16px;
@@ -53,8 +54,8 @@ html, body {
   box-shadow: 0 4px 10px rgba(0,0,0,0.3);
   font-size: 17px;
   line-height: 1.5;
+  display: none; /* ⭐ ซ่อนเริ่มต้น */
 }
-
 </style>
 </head>
 
@@ -65,12 +66,7 @@ html, body {
 <button id="routeBtn" class="map-btn">🧭 เริ่มนำทาง</button>
 <button id="clearRouteBtn" class="map-btn">❌ ปิดนำทาง</button>
 
-<div id="infoBox">
-  <div><b>ระยะทาง:</b> -</div>
-  <div><b>เวลา:</b> -</div>
-  <div><b>สถานที่ B:</b> -</div>
-</div>
-
+<div id="infoBox"></div>
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -84,8 +80,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© OpenStreetMap'
 }).addTo(map);
 
-/* ================= ICONS ================= */
-// B – pin แดง (ไม่อ้วน)
+/* ================= ICON B ================= */
 const bIcon = L.icon({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
@@ -94,7 +89,7 @@ const bIcon = L.icon({
   shadowSize: [41, 41]
 });
 
-/* ================= USER ICON ================= */
+/* ================= ICON A ================= */
 function createUserIcon(heading = 0) {
   return L.divIcon({
     className: '',
@@ -150,9 +145,7 @@ navigator.geolocation.watchPosition(
       userMarker = L.marker(
         [userLat, userLng],
         { icon: createUserIcon(heading) }
-      )
-      .addTo(map)
-      .bindPopup('ตำแหน่งของคุณ (A)');
+      ).addTo(map);
     } else {
       userMarker
         .setLatLng([userLat, userLng])
@@ -193,10 +186,13 @@ function startRouting() {
 
   routingControl.on('routesfound', e => {
     const r = e.routes[0];
-    document.getElementById('infoBox').innerHTML = `
+
+    const infoBox = document.getElementById('infoBox');
+    infoBox.style.display = 'block'; // ⭐ แสดงตอนเริ่มนำทาง
+    infoBox.innerHTML = `
       <div><b>ระยะทาง:</b> ${(r.summary.totalDistance/1000).toFixed(2)} กม.</div>
       <div><b>เวลา:</b> ${(r.summary.totalTime/60).toFixed(1)} นาที</div>
-      <div><b>สถานที่ B:</b> -</div>
+      <div><b>สถานที่:</b> ตำแหน่ง B</div>
     `;
   });
 }
@@ -226,10 +222,7 @@ document.getElementById('clearRouteBtn').onclick = () => {
     map.removeControl(routingControl);
     routingControl = null;
   }
-  document.getElementById('infoBox').innerHTML =
-    `<div><b>ระยะทาง:</b> -</div>
-     <div><b>เวลา:</b> -</div>
-     <div><b>สถานที่ B:</b> -</div>`;
+  document.getElementById('infoBox').style.display = 'none'; // ⭐ ซ่อนกลับ
 };
 
 document.getElementById('focusUserBtn').onclick = () => {
