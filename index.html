@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>LIFF Live Navigation</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -11,58 +11,72 @@
 <style>
 html, body {
   margin: 0;
-  padding: 0;
   height: 100%;
   font-family: system-ui, -apple-system, sans-serif;
 }
+#map { height: 100%; }
 
-#map {
-  width: 100%;
-  height: 100%;
+/* ===== Top Nav Card ===== */
+#navCard {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  border-radius: 18px;
+  padding: 14px 20px;
+  min-width: 260px;
+  z-index: 1200;
+  box-shadow: 0 4px 12px rgba(0,0,0,.35);
+  text-align: center;
+}
+#navMain {
+  font-size: 17px;
+  font-weight: 600;
+}
+#navSub {
+  font-size: 14px;
+  opacity: .7;
 }
 
-/* ===== Buttons ===== */
+/* ===== Floating Buttons ===== */
 .map-btn {
   position: absolute;
-  left: 14px;
-  z-index: 1000;
-  padding: 14px 18px;
-  font-size: 16px;
-  background: #fff;
-  border: 2px solid #222;
-  border-radius: 12px;
+  right: 14px;
+  z-index: 1200;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  background: white;
+  font-size: 22px;
   cursor: pointer;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+  box-shadow: 0 3px 10px rgba(0,0,0,.3);
 }
-
-#focusUserBtn { top: 14px; }
-#focusBBtn    { top: 72px; }
-#routeBtn     { top: 130px; }
+#focusUserBtn { bottom: 200px; }
+#focusBBtn    { bottom: 140px; }
+#routeBtn     { bottom: 80px; background:#1e88ff; color:white; }
 
 /* ===== Bottom Sheet ===== */
 #bottomPanel {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: -260px;
-  background: #fff;
-  border-radius: 18px 18px 0 0;
-  padding: 18px 20px 24px;
-  box-shadow: 0 -4px 12px rgba(0,0,0,0.3);
+  bottom: -220px;
+  background: white;
+  border-radius: 22px 22px 0 0;
+  padding: 18px 22px 26px;
+  box-shadow: 0 -4px 12px rgba(0,0,0,.35);
   z-index: 1200;
-  transition: bottom 0.3s ease;
+  transition: bottom .3s ease;
 }
-
-#bottomPanel.show {
-  bottom: 0;
-}
+#bottomPanel.show { bottom: 0; }
 
 #bottomPanel h3 {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   font-size: 18px;
 }
-
-#bottomPanel .item {
+.bottom-item {
   font-size: 16px;
   margin-bottom: 6px;
 }
@@ -71,15 +85,20 @@ html, body {
 
 <body>
 
+<div id="navCard">
+  <div id="navMain">กำลังค้นหาเส้นทาง…</div>
+  <div id="navSub">-</div>
+</div>
+
 <button id="focusUserBtn" class="map-btn">📍</button>
 <button id="focusBBtn" class="map-btn">📌</button>
-<button id="routeBtn" class="map-btn">🧭 เริ่มนำทาง</button>
+<button id="routeBtn" class="map-btn">🧭</button>
 
 <div id="bottomPanel">
   <h3>🧭 กำลังนำทาง</h3>
-  <div class="item" id="distance">ระยะทาง: -</div>
-  <div class="item" id="time">เวลา: -</div>
-  <div class="item" id="place">สถานที่: -</div>
+  <div class="bottom-item" id="distance">ระยะทาง: -</div>
+  <div class="bottom-item" id="time">เวลา: -</div>
+  <div class="bottom-item" id="place">สถานที่: -</div>
 </div>
 
 <div id="map"></div>
@@ -89,217 +108,155 @@ html, body {
 
 <script>
 /* ===== MAP ===== */
-const map = L.map('map').setView([16.7469, 100.1969], 15);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+const map = L.map('map', { zoomControl: true, maxZoom: 21 })
+  .setView([16.7469, 100.1969], 17);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 21
+}).addTo(map);
+
+map.attributionControl.setPrefix(false);
 
 /* ===== STATE ===== */
 let routingControl = null;
 let isRouting = false;
 let autoFollow = true;
-let lastAutoMove = 0;
 
 /* ===== ICON B ===== */
 const bIcon = L.icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  shadowSize: [41, 41]
+  iconUrl: 'https://maps.gstatic.com/mapfiles/ms2/micons/red.png',
+  iconSize: [32,32],
+  iconAnchor: [16,32]
 });
 
-/* ===== ICON A ===== */
-function createUserIcon(heading = 0) {
+/* ===== MARKER B ===== */
+let bLat = 16.7479, bLng = 100.1947;
+const bMarker = L.marker([bLat,bLng], { icon: bIcon }).addTo(map);
+
+/* ===== USER ICON ===== */
+function userIcon(heading=0){
   return L.divIcon({
-    className: '',
     html: `
-      <div style="
-        width: 32px;
-        height: 32px;
-        transform: rotate(${heading}deg);
-        transition: transform 0.2s linear;
-      ">
-        <svg width="32" height="32" viewBox="0 0 100 100">
-          <!-- วงกลม -->
-          <circle cx="50" cy="50" r="20"
-            fill="#1e88ff"
-            stroke="white"
-            stroke-width="6"
-          />
-          <!-- หัวลูกศร -->
-          <polygon points="50,5 42,28 58,28"
-            fill="#1e88ff"
-          />
+      <div style="transform:rotate(${heading}deg);transition:.2s">
+        <svg width="36" height="36" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="22" fill="#1e88ff" stroke="white" stroke-width="6"/>
+          <polygon points="50,5 40,30 60,30" fill="#1e88ff"/>
         </svg>
-      </div>
-    `,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16]
+      </div>`,
+    iconSize:[36,36],
+    iconAnchor:[18,18]
   });
 }
 
-/* ===== MARKERS ===== */
-let bLat = 16.7479, bLng = 100.1947;
-const bMarker = L.marker([bLat, bLng], { icon: bIcon }).addTo(map);
-
 let userLat, userLng, userMarker;
-
-/* ===== SIMULATE B MOVE ===== */
-setInterval(() => {
-  bLat += (Math.random() - 0.5) * 0.0003;
-  bLng += (Math.random() - 0.5) * 0.0003;
-  bMarker.setLatLng([bLat, bLng]);
-  if (routingControl) updateRoute();
-}, 5000);
-
-/* ===== STOP AUTO FOLLOW WHEN USER DRAGS ===== */
-map.on('dragstart zoomstart', () => autoFollow = false);
+let lastLat=null, lastLng=null, heading=0;
 
 /* ===== GEOLOCATION ===== */
-navigator.geolocation.watchPosition(pos => {
-  const lat = pos.coords.latitude;
-  const lng = pos.coords.longitude;
-  const speed = pos.coords.speed || 0;
+navigator.geolocation.watchPosition(pos=>{
+  userLat = pos.coords.latitude;
+  userLng = pos.coords.longitude;
 
-  let heading = headingSmooth;
-
-  if (lastLat !== null && lastLng !== null && speed > 0.4) {
-    const newHeading = calcHeading(lastLat, lastLng, lat, lng);
-    heading = smooth(headingSmooth, newHeading);
+  if(lastLat){
+    heading = calcHeading(lastLat,lastLng,userLat,userLng);
   }
 
-  headingSmooth = heading;
-
-  if (!userMarker) {
-    userMarker = L.marker([lat, lng], {
-      icon: createUserIcon(headingSmooth)
-    }).addTo(map);
-  } else {
-    userMarker
-      .setLatLng([lat, lng])
-      .setIcon(createUserIcon(headingSmooth));
+  if(!userMarker){
+    userMarker = L.marker([userLat,userLng],{icon:userIcon(heading)}).addTo(map);
+    map.setView([userLat,userLng],18);
+  }else{
+    userMarker.setLatLng([userLat,userLng])
+      .setIcon(userIcon(heading));
   }
 
-  lastLat = lat;
-  lastLng = lng;
+  lastLat=userLat; lastLng=userLng;
 
-  if (isRouting && autoFollow) {
-    map.panTo([lat, lng], { animate: true, duration: 0.6 });
+  if(isRouting && autoFollow){
+    map.panTo([userLat,userLng],{animate:true,duration:.7});
   }
-
-}, null, { enableHighAccuracy: true });
+},null,{enableHighAccuracy:true});
 
 /* ===== ROUTING ===== */
-async function getPlaceName() {
-  try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${bLat}&lon=${bLng}`
-    );
-    const data = await res.json();
-    return data.display_name || '-';
-  } catch {
-    return '-';
-  }
-}
+function startRouting(){
+  if(!userLat) return alert("ยังไม่พบตำแหน่ง");
 
-function startRouting() {
-  if (!userLat || !userLng) return;
-
-  if (routingControl) map.removeControl(routingControl);
+  if(routingControl) map.removeControl(routingControl);
 
   routingControl = L.Routing.control({
-    router: L.Routing.osrmv1({
-      serviceUrl: 'https://router.project-osrm.org/route/v1',
-      timeout: 10000
-    }),
-    waypoints: [
-      L.latLng(userLat, userLng),
-      L.latLng(bLat, bLng)
+    waypoints:[
+      L.latLng(userLat,userLng),
+      L.latLng(bLat,bLng)
     ],
-    addWaypoints: false,
-    draggableWaypoints: false,
-    routeWhileDragging: false,
-    fitSelectedRoutes: true,
-    show: false,
-    createMarker: () => null,
-    lineOptions: {
-      styles: [{ color: '#1e88ff', weight: 6, opacity: 0.9 }]
+    addWaypoints:false,
+    draggableWaypoints:false,
+    createMarker:()=>null,
+    show:false,
+    lineOptions:{
+      styles:[
+        {color:'#fff',weight:10,opacity:.9},
+        {color:'#1e88ff',weight:6,opacity:1}
+      ]
     }
   }).addTo(map);
 
-  routingControl.on('routesfound', e => {
-    const r = e.routes[0];
+  routingControl.on('routesfound',e=>{
+    const r=e.routes[0];
+    navMain.innerText=`⏱ ${(r.summary.totalTime/60).toFixed(0)} นาที`;
+    navSub.innerText=`📏 ${(r.summary.totalDistance/1000).toFixed(2)} กม.`;
 
-    distance.innerText =
-      `ระยะทาง: ${(r.summary.totalDistance/1000).toFixed(2)} กม.`;
-    time.innerText =
-      `เวลา: ${(r.summary.totalTime/60).toFixed(1)} นาที`;
+    distance.innerText=`ระยะทาง: ${(r.summary.totalDistance/1000).toFixed(2)} กม.`;
+    time.innerText=`เวลา: ${(r.summary.totalTime/60).toFixed(1)} นาที`;
 
-    place.innerText = 'สถานที่: กำลังโหลด...';
     bottomPanel.classList.add('show');
-
-    getPlaceName().then(name => {
-      place.innerText = `สถานที่: ${name}`;
-    });
   });
 
-  routingControl.on('routingerror', () => {
-    alert('ไม่สามารถคำนวณเส้นทางได้');
-  });
-
-  isRouting = true;
-  autoFollow = true;
-  map.flyTo([userLat, userLng], 18, { animate: true, duration: 1 });
+  isRouting=true;
+  autoFollow=true;
 }
 
-function stopRouting() {
-  if (routingControl) map.removeControl(routingControl);
-  routingControl = null;
+function stopRouting(){
+  if(routingControl) map.removeControl(routingControl);
+  routingControl=null;
   bottomPanel.classList.remove('show');
-  isRouting = false;
-  autoFollow = false;
+  navMain.innerText="หยุดการนำทาง";
+  navSub.innerText="-";
+  isRouting=false;
 }
 
 /* ===== UPDATE ROUTE ===== */
-function updateRoute() {
-  if (routingControl && userLat && userLng) {
+setInterval(()=>{
+  bLat+=(Math.random()-.5)*0.00025;
+  bLng+=(Math.random()-.5)*0.00025;
+  bMarker.setLatLng([bLat,bLng]);
+  if(routingControl){
     routingControl.setWaypoints([
-      L.latLng(userLat, userLng),
-      L.latLng(bLat, bLng)
+      L.latLng(userLat,userLng),
+      L.latLng(bLat,bLng)
     ]);
   }
-}
+},5000);
 
 /* ===== BUTTONS ===== */
-routeBtn.onclick = () => {
-  if (!isRouting) {
+routeBtn.onclick=()=>{
+  if(!isRouting){
     startRouting();
-    routeBtn.innerText = '❌ ปิดนำทาง';
-  } else {
+    routeBtn.innerText='❌';
+  }else{
     stopRouting();
-    routeBtn.innerText = '🧭 เริ่มนำทาง';
+    routeBtn.innerText='🧭';
   }
 };
+focusUserBtn.onclick=()=>userLat&&map.setView([userLat,userLng],18);
+focusBBtn.onclick=()=>map.setView([bLat,bLng],18);
 
-focusUserBtn.onclick = () => userLat && map.setView([userLat, userLng], 17);
-focusBBtn.onclick = () => map.setView([bLat, bLng], 17);
+map.on('dragstart zoomstart',()=>autoFollow=false);
 
-function calcHeading(lat1, lng1, lat2, lng2) {
-  const toRad = d => d * Math.PI / 180;
-  const y = Math.sin(toRad(lng2 - lng1)) * Math.cos(toRad(lat2));
-  const x =
-    Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
-    Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) *
-    Math.cos(toRad(lng2 - lng1));
-  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-}
-
-let lastLat = null;
-let lastLng = null;
-let headingSmooth = 0;
-
-function smooth(prev, next, factor = 0.2) {
-  let diff = ((next - prev + 540) % 360) - 180;
-  return prev + diff * factor;
+/* ===== HEADING ===== */
+function calcHeading(lat1,lng1,lat2,lng2){
+  const toRad=d=>d*Math.PI/180;
+  const y=Math.sin(toRad(lng2-lng1))*Math.cos(toRad(lat2));
+  const x=Math.cos(toRad(lat1))*Math.sin(toRad(lat2))-
+    Math.sin(toRad(lat1))*Math.cos(toRad(lat2))*Math.cos(toRad(lng2-lng1));
+  return (Math.atan2(y,x)*180/Math.PI+360)%360;
 }
 </script>
 
